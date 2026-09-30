@@ -14,6 +14,7 @@
 - `src/state/controller.ts`: immutable scenario snapshots, atomic actions, grouped field edits and undo/redo. `codec.ts` validates/version-packs links; `browser.ts` alone reads/writes prediction URLs.
 - `src/App.tsx` and `src/components/`: Solid views with plain CSS. `main.tsx` mounts the app. Keep domain calculations independent of Solid.
 - `src/services/results/{compression,model}.ts` and `src/data/`: retained 2023 compatibility. Pure legacy scoring tests remain under `src/services/logs/`.
+- `wrangler.jsonc` and `src/worker.ts`: Cloudflare static assets plus a stateless document fallback preserving legacy slash paths. Root/common assets bypass the Worker; prediction state stays in the browser.
 - `e2e/`: production-browser journeys. [Tournament sources](docs/tournament-sources.md) records official fixtures, rule assumptions and rankings; [upgrade plan](docs/upgrade-plan.md) holds research, measurements and follow-ups.
 
 ## Change contracts
@@ -31,4 +32,6 @@
 
 Use Node from `.node-version` and npm 12.1.0 with the committed lockfile: `npm ci`, `npm run dev`, `npm run check`. The combined check runs native TypeScript 7 and compatible TypeScript 6 checks, flat ESLint, unit/property tests and the production build. Keep the TS6 API dependency for lint compatibility.
 
-For interaction/state changes, install Chromium with `npx playwright install chromium` and run `npm run test:browser`. Cover affected scoring/qualification rules, partial/conflicting edits, grouped and dependent undo, fresh-browser sharing, both legacy formats, malformed links, navigation, focus and mobile layout. Focused tests are prohibited. Keep this guide concise and update it when architecture or contracts change.
+For interaction/state changes, install Chromium with `npx playwright install chromium` and run `npm run test:browser` against the local Workers runtime. `BASE_URL` targets a deployed site. Cover affected scoring/qualification rules, partial/conflicting edits, grouped and dependent undo, fresh-browser sharing, both legacy formats, malformed links, navigation, focus and mobile layout. Focused tests are prohibited. Keep this guide concise and update it when architecture or contracts change.
+
+Deployment follows PSS: use `git push` to `main` for normal publishing to `rwc2027.myplaceforthings.com`, with checks before deployment and live smoke tests afterward. Branches/PRs check; manual workflow runs deploy the selected branch. `npm run deploy:check` is a dry run; `npm run deploy` is for bootstrap/recovery. Preserve legacy URLs before Cloudflare asset normalization, immutable caching only for hashed bundles, and runtime/credential files in `.gitignore`. Keep npm's pinned `allowScripts` entries consistent with Wrangler's required esbuild/workerd versions.

@@ -5,7 +5,7 @@ import solid from "eslint-plugin-solid";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  { ignores: ["dist/**", "node_modules/**", "coverage/**", "playwright-report/**", "test-results/**"] },
+  { ignores: ["dist/**", "node_modules/**", ".wrangler/**", "coverage/**", "playwright-report/**", "test-results/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

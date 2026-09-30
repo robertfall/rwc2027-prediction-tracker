@@ -14,6 +14,9 @@ dist-ssr
 playwright-report
 test-results
 coverage
+.wrangler/
+.dev.vars*
+.env*
 
 # Editor directories and files
 !src/*/logs

@@ -3,9 +3,15 @@ name: Check
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  # Main pushes and manual runs publish the same Worker, even from different refs.
+  group: ${{ github.workflow }}-${{ (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && 'production' || github.ref }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
 
 jobs:
   check:
@@ -19,5 +25,58 @@ jobs:
       - run: npm install --global npm@12.1.0
       - run: npm ci
       - run: npm run check
+      - run: npm run deploy:check
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+
+  deploy:
+    # Main is production. Branches and pull requests only check; manual runs deploy.
+    needs: check
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://rwc2027.myplaceforthings.com
+    env:
+      BASE_URL: https://rwc2027.myplaceforthings.com
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm install --global npm@12.1.0
+      - run: npm ci
+      - run: npm run build
+      - uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+      - name: Wait for production hostname
+        run: |
+          readiness_body=$(mktemp)
+          trap 'rm -f "$readiness_body"' EXIT
+          readiness_deadline=$((SECONDS + 120))
+          readiness_status=000
+          while (( SECONDS < readiness_deadline )); do
+            readiness_remaining=$((readiness_deadline - SECONDS))
+            if (( readiness_remaining <= 0 )); then break; fi
+            readiness_timeout=$((readiness_remaining < 10 ? readiness_remaining : 10))
+            readiness_status=$(curl --silent --show-error --connect-timeout 5 --max-time "$readiness_timeout" --output "$readiness_body" --write-out '%{http_code}' "$BASE_URL/") || readiness_status=000
+            if [[ "$readiness_status" == 200 ]] && grep -q 'id="root"' "$readiness_body"; then
+              echo "Production hostname is serving the app."
+              exit 0
+            fi
+            echo "Waiting for $BASE_URL/ (HTTP $readiness_status; app shell not ready)."
+            readiness_remaining=$((readiness_deadline - SECONDS))
+            if (( readiness_remaining > 0 )); then
+              sleep "$((readiness_remaining < 5 ? readiness_remaining : 5))"
+            fi
+          done
+          echo "::error::Production hostname did not serve the app within 120 seconds (last HTTP $readiness_status). Check DNS, TLS provisioning, and the Worker deployment."
+          exit 1
+      - name: Smoke test production
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:browser
