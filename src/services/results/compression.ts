@@ -1,163 +1,146 @@
-import { MatchNumber } from "../../data/fixtures";
-import { Result } from "./service";
+import type { MatchNumber } from "../../data/fixtures";
+import {
+  isValidResultFieldValue,
+  resultFields,
+  type Result,
+  type TouchedResult,
+} from "./model";
 
-function touchedBitsToBytes(touchedBits: number[]) {
-  let cursor = 0;
-  let step = 0;
-  let currentByte = 0;
-  let packedBits: number[] = [];
+export const CURRENT_LINK_IDENTITY = {
+  tournament: "rwc2023",
+  dataset: "fixtures-v1",
+} as const;
+export type LinkIdentity = { tournament: string; dataset: string };
+const VERSION = "v1";
+const TOUCHED = 16;
 
-  while (cursor < touchedBits.length) {
-    step = cursor % 8;
-
-    if (step === 0 && cursor !== 0) {
-      packedBits.push(currentByte);
-      currentByte = 0;
-    }
-
-    currentByte += touchedBits[cursor] << step;
-    cursor++;
+export class PredictionLinkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PredictionLinkError";
   }
-  packedBits.push(currentByte);
-
-  return packedBits;
 }
 
-function touchedBytesToBits(total: number, touchedBytes: Uint8Array) {
-  const totalRows = touchedBytes.length;
+function fail(message = "The prediction link is malformed."): never {
+  throw new PredictionLinkError(message);
+}
 
-  let touchedBits: number[] = [];
-  let row = 0;
+function toBase64(bytes: Uint8Array): string {
+  return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
+}
 
-  while (row < totalRows) {
-    const lastRow = row === totalRows - 1;
-
-    // Most rows have 8 bits
-    let bitsInRow = 8;
-
-    // The last row might have 8 bits or less
-    if (lastRow && total % 8 !== 0) {
-      bitsInRow = total % 8;
-    }
-
-    const currentRow = touchedBytes[row];
-    let item = 0;
-
-    while (item < bitsInRow) {
-      touchedBits.push((currentRow & Math.pow(2, item)) >> item);
-      item++;
-    }
-
-    row++;
+function fromBase64(value: string, urlSafe: boolean): Uint8Array {
+  if (!value || value.length > 4096) fail();
+  if (urlSafe ? !/^[A-Za-z0-9_-]+$/.test(value) : !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) fail();
+  const normalized = urlSafe ? value.replace(/-/g, "+").replace(/_/g, "/") : value;
+  if (normalized.length % 4 === 1) fail();
+  try {
+    const bytes = Uint8Array.from(atob(normalized), (character) => character.charCodeAt(0));
+    if (toBase64(bytes).replace(/=+$/, "") !== normalized.replace(/=+$/, "")) fail();
+    return bytes;
+  } catch {
+    return fail();
   }
-  return touchedBits;
 }
 
-function resultsToPackedUint8Array(results: Result[]) {
-  const rawNumbers = results.flatMap((result) =>
-    result.touched
-      ? [
-          result.homeScore,
-          result.awayScore,
-          // Pack tries into 4 bits each as they can't be more than 16
-          (result.homeTries << 4) + result.awayTries,
-        ]
-      : []
-  );
-
-  const resultCount = results.length;
-
-  const touchedBits: number[] = results.map((result) =>
-    result.touched ? 1 : 0
-  );
-
-  const packedBits = touchedBitsToBytes(touchedBits);
-
-  return new Uint8Array([resultCount, ...packedBits, ...rawNumbers]);
+function validatePackingResult(result: Result): void {
+  // The codec packs byte-sized IDs; the storage/model boundary validates the active fixtures.
+  if (!Number.isInteger(result.matchNumber) || result.matchNumber < 1 || result.matchNumber > 255 ||
+    typeof result.touched !== "boolean" || resultFields.some((field) => {
+      const value = result.touched ? result[field] : (result as unknown as Record<string, unknown>)[field];
+      return value !== undefined && (!result.touched || !isValidResultFieldValue(field, value));
+    })) fail("Predictions contain invalid match numbers or scoring values.");
 }
 
-function packedUint8ArrayToResults(
-  resultCount: number,
-  touchedBits: number[],
-  resultValues: Uint8Array
-) {
-  let results: Result[] = [];
-  let matchIndex = 1;
-  let cursor = 0;
-
-  while (matchIndex <= resultCount) {
-    const matchNumber = matchIndex++ as MatchNumber;
-
-    if (touchedBits[matchNumber - 1]) {
-      const homeScore = resultValues[cursor++];
-      const awayScore = resultValues[cursor++];
-      const homeTries = resultValues[cursor] >> 4;
-      const awayTries = resultValues[cursor++] & 0b1111;
-
-      results.push({
-        touched: true,
-        matchNumber,
-        homeScore,
-        awayScore,
-        homeTries,
-        awayTries,
-      });
-    } else {
-      results.push({
-        touched: false,
-        matchNumber,
+/** Sparse, explicit IDs and field-presence bits preserve partial edits and zero values. */
+export function encode(results: Result[], identity: LinkIdentity = CURRENT_LINK_IDENTITY): string {
+  if (results.length > 255 || !/^[A-Za-z0-9_-]+$/.test(identity.tournament) ||
+    !/^[A-Za-z0-9_-]+$/.test(identity.dataset)) fail();
+  const bytes = [results.length];
+  const ids = new Set<number>();
+  for (const result of results) {
+    validatePackingResult(result);
+    if (ids.has(result.matchNumber)) fail("The prediction link repeats a match number.");
+    ids.add(result.matchNumber);
+    let mask = result.touched ? TOUCHED : 0;
+    const values: number[] = [];
+    if (result.touched) {
+      resultFields.forEach((field, index) => {
+        if (result[field] !== undefined) {
+          mask |= 1 << index;
+          values.push(result[field]!);
+        }
       });
     }
+    bytes.push(result.matchNumber, mask, ...values);
   }
+  const packed = toBase64(new Uint8Array(bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${VERSION}.${identity.tournament}.${identity.dataset}.${packed}`;
+}
+
+function decodeCurrent(value: string, expected: LinkIdentity): Result[] {
+  const parts = value.split(".");
+  if (parts[0] !== VERSION) fail("This prediction link uses an unsupported version.");
+  if (parts.length !== 4) fail();
+  if (parts[1] !== expected.tournament || parts[2] !== expected.dataset) {
+    fail("This prediction link belongs to a different tournament or fixture dataset.");
+  }
+  const bytes = fromBase64(parts[3], true);
+  const results: Result[] = [];
+  const ids = new Set<number>();
+  let cursor = 1;
+  for (let index = 0; index < bytes[0]; index++) {
+    if (cursor + 2 > bytes.length) fail();
+    const rawMatchNumber = bytes[cursor++];
+    const matchNumber = rawMatchNumber as MatchNumber;
+    const mask = bytes[cursor++];
+    if (rawMatchNumber === 0 || ids.has(matchNumber) || mask > 31 || (mask !== 0 && !(mask & TOUCHED))) fail();
+    ids.add(matchNumber);
+    if (mask === 0) {
+      results.push({ matchNumber, touched: false });
+      continue;
+    }
+    const result: TouchedResult = { matchNumber, touched: true };
+    resultFields.forEach((field, fieldIndex) => {
+      if (mask & (1 << fieldIndex)) {
+        if (cursor >= bytes.length || !isValidResultFieldValue(field, bytes[cursor])) fail();
+        result[field] = bytes[cursor++];
+      }
+    });
+    results.push(result);
+  }
+  if (cursor !== bytes.length) fail();
   return results;
 }
 
-function binaryToString(buffer: Uint8Array) {
-  return btoa(
-    buffer.reduce((acc, i) => {
-      acc += String.fromCodePoint(i);
-      return acc;
-    }, "")
-  );
+function decodeLegacy(value: string, expected: LinkIdentity): Result[] {
+  if (expected.tournament !== CURRENT_LINK_IDENTITY.tournament || expected.dataset !== CURRENT_LINK_IDENTITY.dataset) {
+    fail("Legacy prediction links belong to the 2023 tournament.");
+  }
+  const bytes = fromBase64(value, false);
+  const count = bytes[0];
+  if (count < 1 || count > 48) fail("The legacy prediction link has an invalid 2023 match count.");
+  const bitmapLength = Math.ceil(count / 8);
+  if (bytes.length < 1 + bitmapLength) fail();
+  if (count % 8 && (bytes[bitmapLength] >> (count % 8)) !== 0) fail();
+  let cursor = 1 + bitmapLength;
+  const results: Result[] = [];
+  for (let index = 0; index < count; index++) {
+    const matchNumber = (index + 1) as MatchNumber;
+    if (!(bytes[1 + Math.floor(index / 8)] & (1 << (index % 8)))) {
+      results.push({ matchNumber, touched: false });
+      continue;
+    }
+    if (cursor + 3 > bytes.length) fail();
+    const homeScore = bytes[cursor++];
+    const awayScore = bytes[cursor++];
+    const tries = bytes[cursor++];
+    results.push({ matchNumber, touched: true, homeScore, awayScore, homeTries: tries >> 4, awayTries: tries & 15 });
+  }
+  if (cursor !== bytes.length) fail();
+  return results;
 }
 
-function stringToBinary(str: string) {
-  return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
-}
-
-export function d2b(d: number, length: number = 8) {
-  return d.toString(2).padStart(length, "0");
-}
-
-export function encode(results: Result[]) {
-  const packed = resultsToPackedUint8Array(results);
-  return binaryToString(packed);
-}
-
-const BYTES_USED_FOR_COUNT = 1;
-
-function getTotalCount(typedArray: Uint8Array) {
-  return typedArray
-    .slice(0, BYTES_USED_FOR_COUNT)
-    .reduce((acc, i) => acc + i, 0);
-}
-
-export function decode(encoded: string) {
-  const typedArray = stringToBinary(encoded);
-
-  const resultCount = getTotalCount(typedArray);
-
-  const touchedBytesCount = Math.floor(resultCount / 8);
-  const touchedBits = touchedBytesToBits(
-    resultCount,
-    typedArray.slice(
-      BYTES_USED_FOR_COUNT,
-      touchedBytesCount + BYTES_USED_FOR_COUNT
-    )
-  );
-
-  const resultValues = typedArray.slice(
-    BYTES_USED_FOR_COUNT + touchedBytesCount
-  );
-  return packedUint8ArrayToResults(resultCount, touchedBits, resultValues);
+export function decode(encoded: string, expected: LinkIdentity = CURRENT_LINK_IDENTITY): Result[] {
+  return encoded.includes(".") ? decodeCurrent(encoded, expected) : decodeLegacy(encoded, expected);
 }

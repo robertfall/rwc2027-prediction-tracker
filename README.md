@@ -1,27 +1,30 @@
-# React + TypeScript + Vite
+# Rugby World Cup prediction tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A lightweight, browser-only predictor for the 2027 Rugby World Cup. Pick winners across six pools and the complete knockout bracket, or expand a match to choose scores, margin, tries and bonus points. Undo, redo and reset work locally; copying the URL shares the whole scenario.
 
-Currently, two official plugins are available:
+Unspecified details use deterministic suggestions. Live odds and the calibrated forecasting engine are follow-ups. The official 52-match schedule is included; final 2027 tie regulations and the future ranking snapshot remain provisional. [Sources and assumptions](docs/tournament-sources.md)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Development
 
-## Expanding the ESLint configuration
+Use **Node 24.21.0** (`.node-version`) and **npm 12.1.0**.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-   parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-   },
+```sh
+npm ci
+npm run dev
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+```sh
+npm run check
+npx playwright install chromium
+npm run test:browser
+```
+
+The browser suite builds and previews the production app. CI runs the same checks. The stack is Solid, Vite, TypeScript and plain CSS; calculations and scenario history are independent of the renderer.
+
+## Static hosting
+
+`npm run build` creates `dist/`; `npm run preview` serves it locally. For a subdirectory, build with `npm run build -- --base=/your-path/`.
+
+Current links keep versioned compressed predictions in the URL fragment and need no prediction server. Original 2023 path links remain supported when the host sends unknown paths to `index.html`; imported 2023 links retain their tournament identity. Invalid links are preserved until the user chooses recovery.
+
+See [AGENTS.md](AGENTS.md) for development contracts and [the upgrade plan](docs/upgrade-plan.md) for completed work and remaining stages. No external provider credentials are required.

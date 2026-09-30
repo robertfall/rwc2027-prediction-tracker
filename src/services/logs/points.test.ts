@@ -1,102 +1,27 @@
 import { describe, it, expect } from "vitest";
-
+import { CompleteResult } from "../results/model";
 import { getPoints } from "./points";
 
-const matchNumber = 1 as const;
-
-describe("getPoints", () => {
-  describe("home loss", () => {
-    describe("with less than 4 tries", () => {
-      it("returns the correct points", () => {
-        const { homePoints, awayPoints } = getPoints({
-          touched: true,
-          matchNumber,
-          homeScore: 10,
-          homeTries: 2,
-          awayScore: 15,
-          awayTries: 3,
-        });
-        expect(homePoints).toEqual(0);
-        expect(awayPoints).toEqual(4);
-      });
-    });
-
-    describe("with 4 or more tries", () => {
-      it("returns the correct points", () => {
-        const { homePoints, awayPoints } = getPoints({
-          touched: true,
-          matchNumber,
-          homeScore: 20,
-          homeTries: 4,
-          awayScore: 25,
-          awayTries: 5,
-        });
-        expect(homePoints).toEqual(1);
-        expect(awayPoints).toEqual(5);
-      });
-    });
+describe("pool points", () => {
+  it.each([
+    [20, 13, 3, 3, 4, 1],
+    [20, 12, 3, 3, 4, 0],
+    [13, 20, 3, 3, 1, 4],
+    [12, 20, 3, 3, 0, 4],
+    [20, 13, 4, 4, 5, 2],
+    [13, 20, 4, 4, 2, 5],
+    [20, 12, 4, 4, 5, 1],
+    [12, 20, 4, 4, 1, 5],
+    [15, 15, 3, 3, 2, 2],
+    [20, 20, 4, 4, 3, 3],
+    [20, 20, 4, 3, 3, 2],
+    [0, 0, 0, 0, 2, 2],
+  ])("scores %i:%i, tries %i:%i yield %i:%i pool points", (homeScore, awayScore, homeTries, awayTries, homePoints, awayPoints) => {
+    expect(getPoints({ matchNumber: 1, touched: true, homeScore, awayScore, homeTries, awayTries })).toEqual({ homePoints, awayPoints });
   });
 
-  describe("home win", () => {
-    describe("with less than 4 tries", () => {
-      it("returns the correct points", () => {
-        const { homePoints, awayPoints } = getPoints({
-          touched: true,
-          matchNumber,
-          homeScore: 18,
-          homeTries: 3,
-          awayScore: 15,
-          awayTries: 3,
-        });
-        expect(homePoints).toEqual(4);
-        expect(awayPoints).toEqual(0);
-      });
-    });
-
-    describe("with 4 or more tries", () => {
-      it("returns the correct points", () => {
-        const { homePoints, awayPoints } = getPoints({
-          touched: true,
-          matchNumber,
-          homeScore: 22,
-          homeTries: 4,
-          awayScore: 20,
-          awayTries: 4,
-        });
-        expect(homePoints).toEqual(5);
-        expect(awayPoints).toEqual(1);
-      });
-    });
-  });
-
-  describe("draw", () => {
-    describe("with less than 4 tries", () => {
-      it("returns the correct points", () => {
-        const { homePoints, awayPoints } = getPoints({
-          touched: true,
-          matchNumber,
-          homeScore: 15,
-          homeTries: 3,
-          awayScore: 15,
-          awayTries: 3,
-        });
-        expect(homePoints).toEqual(2);
-        expect(awayPoints).toEqual(2);
-      });
-    });
-    describe("with 4 or more tries", () => {
-      it("returns the correct points", () => {
-        const { homePoints, awayPoints } = getPoints({
-          touched: true,
-          matchNumber,
-          homeScore: 20,
-          homeTries: 4,
-          awayScore: 20,
-          awayTries: 4,
-        });
-        expect(homePoints).toEqual(3);
-        expect(awayPoints).toEqual(3);
-      });
-    });
+  it("rejects incomplete and nonnumeric results at the scoring boundary", () => {
+    expect(() => getPoints({ matchNumber: 1, touched: true, homeScore: 20 } as CompleteResult)).toThrow(RangeError);
+    expect(() => getPoints({ matchNumber: 1, touched: true, homeScore: "20", awayScore: 13, homeTries: 3, awayTries: 2 } as unknown as CompleteResult)).toThrow(RangeError);
   });
 });
