@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:32px;font-family:var(--font-body);color:var(--color-ink)">
+  <sc-for list="{{ pools }}" as="p" hint-placeholder-count="2">
+    <section style="display:flex;flex-wrap:wrap;gap:16px 40px;align-items:flex-start;padding-top:16px;border-top:1px solid var(--color-border-subtle)">
+      <div style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ p.matches }}" as="m" hint-placeholder-count="6">
+          <dc-import name="MatchCard" match="{{ m }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,190px"></dc-import>
+        </sc-for>
+      </div>
+      <aside style="order:{{ asideOrder }};flex:1 1 300px;min-width:0;position:{{ asidePos }};top:112px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+          <h2 style="margin:0;font:700 24px/1 var(--font-display);text-transform:uppercase">{{ p.name }}</h2>
+          <span style="font-size:13px;color:var(--color-muted);font-variant-numeric:tabular-nums">{{ p.pickedText }}</span>
+        </div>
+        <dc-import name="PoolTable" narrow="{{ narrow }}" rows="{{ p.table }}" hint-size="100%,220px"></dc-import>
+      </aside>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;pools&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;onPick&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;onDetails&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;pickStyle&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;}}">class Component extends DCLogic {
+  renderVals() {
+    const n = !!this.props.narrow;
+    return { asideOrder: n ? -1 : 0, asidePos: n ? 'static' : 'sticky' };
+  }
+}</script>
+</body>
+</html>

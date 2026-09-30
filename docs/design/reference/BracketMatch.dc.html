@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+</helmet>
+<div style="background:var(--color-white);border:1px solid var(--color-border-subtle);border-radius:12px;overflow:hidden;font-family:var(--font-body);color:var(--color-ink)">
+  <button type="button" onClick="{{ openDetails }}" disabled="{{ noDetails }}" style="width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 12px;border:0;border-bottom:1px solid var(--color-border-subtle);background:var(--color-white);font:400 13px/1.3 var(--font-body);color:var(--color-muted);cursor:pointer;text-align:left" style-hover="color:var(--color-ink)">
+    <span>{{ match.head }}</span>
+    <span style="font-variant-numeric:tabular-nums">{{ match.dateTime }}</span>
+  </button>
+  <button type="button" onClick="{{ pickHome }}" disabled="{{ h.dis }}" aria-pressed="{{ match.home.sel }}" style="width:100%;height:44px;display:flex;align-items:center;gap:8px;padding:4px 12px;border:0;box-shadow:{{ h.ring }};background:{{ h.bg }};color:{{ h.fg }};cursor:{{ h.cur }};font:600 15px/1.25 var(--font-body);text-align:left;transition:background 150ms cubic-bezier(.2,.8,.2,1)" style-hover="text-decoration:underline">
+    <img src="{{ match.home.flag }}" alt="" style="display:{{ h.fl }};flex:none;width:22px;height:15px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgb(32 42 39 / .12)">
+    <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ match.home.label }}</span>
+    <span style="font:700 20px/1 var(--font-display);font-variant-numeric:tabular-nums">{{ match.hs }}</span>
+  </button>
+  <div style="height:1px;background:var(--color-border-subtle)"></div>
+  <button type="button" onClick="{{ pickAway }}" disabled="{{ a.dis }}" aria-pressed="{{ match.away.sel }}" style="width:100%;height:44px;display:flex;align-items:center;gap:8px;padding:4px 12px;border:0;box-shadow:{{ a.ring }};background:{{ a.bg }};color:{{ a.fg }};cursor:{{ a.cur }};font:600 15px/1.25 var(--font-body);text-align:left;transition:background 150ms cubic-bezier(.2,.8,.2,1)" style-hover="text-decoration:underline">
+    <img src="{{ match.away.flag }}" alt="" style="display:{{ a.fl }};flex:none;width:22px;height:15px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgb(32 42 39 / .12)">
+    <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ match.away.label }}</span>
+    <span style="font:700 20px/1 var(--font-display);font-variant-numeric:tabular-nums">{{ match.as }}</span>
+  </button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:260,&quot;height&quot;:130},&quot;match&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;onPick&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;onDetails&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;pickStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;filled&quot;,&quot;outline&quot;],&quot;default&quot;:&quot;filled&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  sty(t, o, drawSel) {
+    t = t || {}; o = o || {};
+    if (!t.known) return { bg: 'var(--color-paper)', fg: 'var(--color-muted)', bd: 'var(--color-border-subtle)', cur: 'default', ring: 'none', dis: true, fl: 'none' };
+    if (t.sel) return this.props.pickStyle === 'outline'
+      ? { bg: 'var(--color-white)', fg: 'var(--color-eucalyptus)', bd: 'var(--color-eucalyptus)', cur: 'pointer', ring: 'inset 3px 0 0 var(--color-eucalyptus)', dis: false, fl: 'block' }
+      : { bg: 'color-mix(in srgb, var(--color-eucalyptus) 10%, var(--color-white))', fg: 'var(--color-eucalyptus)', bd: 'var(--color-eucalyptus)', cur: 'pointer', ring: 'inset 3px 0 0 var(--color-eucalyptus)', dis: false, fl: 'block' };
+    const lost = o.sel || drawSel;
+    return { bg: 'var(--color-white)', fg: lost ? 'var(--color-muted)' : 'var(--color-ink)', bd: 'var(--color-border-strong)', cur: 'pointer', ring: 'none', dis: false, fl: 'block' };
+  }
+  renderVals() {
+    const m = this.props.match || { home: {}, away: {} };
+    const pick = (s) => () => this.props.onPick && this.props.onPick(m.no, s);
+    return {
+      h: this.sty(m.home, m.away), a: this.sty(m.away, m.home),
+      noDetails: !m.canDetails,
+      pickHome: pick('h'), pickAway: pick('a'),
+      openDetails: () => this.props.onDetails && this.props.onDetails(m.no),
+    };
+  }
+}
+</script>
+</body>
+</html>

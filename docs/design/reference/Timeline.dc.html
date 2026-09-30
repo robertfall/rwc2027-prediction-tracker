@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:32px;font-family:var(--font-body);color:var(--color-ink);min-width:0">
+  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+    <section style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-strong)">
+        <h2 style="margin:0;font:700 22px/1 var(--font-display);text-transform:uppercase;letter-spacing:-.01em">{{ g.label }}</h2>
+        <span style="font-size:14px;color:var(--color-muted)">{{ g.range }}</span>
+        <span style="margin-left:auto;font-size:14px;color:var(--color-muted);font-variant-numeric:tabular-nums">{{ g.meta }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ g.days }}" as="d" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:{{ cols }};column-gap:20px">
+            <div style="border-right:{{ dateRule }};padding:{{ datePad }};text-align:{{ dateAlign }}">
+              <div style="position:{{ datePos }};top:112px;display:{{ dateDisp }};align-items:baseline;gap:8px">
+                <div style="font:700 36px/1 var(--font-display);font-variant-numeric:tabular-nums">{{ d.dayNum }}</div>
+                <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted);margin-top:{{ dowTop }}">{{ d.dow }}</div>
+                <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-clay)">{{ d.mon }}</div>
+              </div>
+            </div>
+            <div style="padding-bottom:16px;min-width:0">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ d.matches }}" as="m" hint-placeholder-count="3">
+                  <dc-import name="MatchCard" match="{{ m }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,150px"></dc-import>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;groups&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;onPick&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;onDetails&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;pickStyle&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;}}">class Component extends DCLogic {
+  renderVals() {
+    const n = !!this.props.narrow;
+    return {
+      cols: n ? 'minmax(0,1fr)' : '72px minmax(0,1fr)',
+      dateRule: n ? '0' : '2px solid var(--color-border-subtle)',
+      datePad: n ? '0 0 8px' : '4px 16px 16px 0',
+      dateAlign: n ? 'left' : 'right',
+      datePos: n ? 'static' : 'sticky',
+      dateDisp: n ? 'flex' : 'block',
+      dowTop: n ? '0' : '4px',
+    };
+  }
+}</script>
+</body>
+</html>

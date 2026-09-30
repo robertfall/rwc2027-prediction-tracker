@@ -1,0 +1,27 @@
+/* Opt-in utilities from the source tokens.css. Not a reset. */
+.sm-numeric { font-variant-numeric: tabular-nums; }
+.sm-surface { background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-card); }
+.sm-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: var(--control-height); padding: .75rem 1.25rem;
+  border: 1px solid transparent; border-radius: var(--radius-control);
+  background: var(--color-action); color: var(--color-on-action);
+  font: 600 1rem/1.25 var(--font-body); text-decoration: none; cursor: pointer;
+  transition: background var(--duration-control) var(--ease-standard);
+}
+.sm-button:hover { background: var(--color-action-hover); }
+.sm-button:focus-visible, .sm-focusable:focus-visible {
+  outline: 3px solid var(--color-focus); outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--color-paper);
+}
+.sm-input {
+  min-height: var(--control-height); padding: .75rem 1rem;
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-control);
+  background: var(--color-white); color: var(--color-ink); font: inherit;
+}
+.sm-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.sm-display { font-family: var(--font-display); text-transform: uppercase; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+/* Components use this for focus-visible rings on elements rendered from JSX. */
+.sm-focus:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; box-shadow: 0 0 0 3px var(--color-paper); }
+@keyframes sm-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sm-fade { from { opacity: 0; } to { opacity: 1; } }

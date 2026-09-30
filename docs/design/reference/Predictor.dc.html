@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/shape.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/motion.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/tokens/utilities.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/components/components.css">
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+  <style>
+    body{margin:0;background:var(--color-paper);color:var(--color-ink);font-family:var(--font-body)}
+    a{color:var(--color-eucalyptus)} a:hover{color:var(--color-eucalyptus-hover)}
+  </style>
+</helmet>
+<div style="min-height:100vh;background:var(--color-paper);font-family:var(--font-body);color:var(--color-ink)">
+  <div style="position:{{ barPos }};top:0;z-index:50;background:var(--color-paper);border-bottom:1px solid var(--color-border-subtle)">
+    <div style="max-width:1248px;margin:0 auto;padding:4px clamp(16px,4vw,48px);min-height:52px;display:flex;flex-wrap:wrap;align-items:center;gap:0 {{ barGap }}">
+      <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Wordmark" size="{{ wmSize }}" hint-size="140px,24px"></x-import>
+      <nav aria-label="Stage" style="order:{{ navOrder }};flex:{{ navFlex }};align-self:stretch;min-height:44px;display:flex;align-items:stretch;justify-content:{{ navJustify }};gap:4px">
+        <button type="button" onClick="{{ goPools }}" aria-current="{{ selPools }}" style="display:flex;align-items:center;gap:8px;padding:0 8px;border:0;background:transparent;color:{{ poolsFg }};font:600 15px/1 var(--font-body);cursor:pointer;box-shadow:{{ poolsBar }}">
+          <span style="width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 12px/1 var(--font-body);background:{{ poolsDotBg }};color:{{ poolsDotFg }};border:1px solid {{ poolsDotBd }}">{{ poolsDot }}</span>
+          <span>Pools</span>
+          <span style="font-size:13px;font-weight:600;color:var(--color-muted);font-variant-numeric:tabular-nums">{{ poolCount }}</span>
+        </button>
+        <span style="display:flex;align-items:center"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="chevron-right" size="{{ 16 }}" color="var(--color-border-strong)" hint-size="16px,16px"></x-import></span>
+        <sc-if value="{{ koLocked }}">
+          <span style="display:flex;align-items:center">
+            <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Tooltip" content="{{ koTip }}" placement="bottom" hint-size="130px,40px">
+              <button type="button" aria-disabled="true" style="min-height:40px;display:flex;align-items:center;gap:8px;padding:0 8px;border:0;background:transparent;color:var(--color-muted);font:600 15px/1 var(--font-body);cursor:not-allowed">
+                <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="lock" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+                <span>Knockout</span>
+              </button>
+            </x-import>
+          </span>
+        </sc-if>
+        <sc-if value="{{ koOpen }}">
+          <button type="button" onClick="{{ goKo }}" aria-current="{{ selKo }}" style="display:flex;align-items:center;gap:8px;padding:0 8px;border:0;background:transparent;color:{{ koFg }};font:600 15px/1 var(--font-body);cursor:pointer;box-shadow:{{ koBar }}">
+            <span style="width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 12px/1 var(--font-body);background:{{ koDotBg }};color:{{ koDotFg }};border:1px solid {{ koDotBd }}">{{ koDot }}</span>
+            <span>Knockout</span>
+            <span style="font-size:13px;font-weight:600;color:var(--color-muted);font-variant-numeric:tabular-nums">{{ koCount }}</span>
+          </button>
+        </sc-if>
+      </nav>
+      <div style="order:2;margin-left:auto;display:flex;align-items:center;gap:6px">
+        <div role="group" aria-label="History" style="flex:none;display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden;background:var(--color-white)">
+          <button type="button" onClick="{{ undo }}" disabled="{{ noUndo }}" aria-label="Undo" title="Undo" style="flex:none;white-space:nowrap;min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);cursor:pointer;width:36px;border-left:0;background:var(--color-white);color:{{ undoFg }}" style-hover="background:var(--color-paper)"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="undo-2" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+          <button type="button" onClick="{{ redo }}" disabled="{{ noRedo }}" aria-label="Redo" title="Redo" style="flex:none;white-space:nowrap;min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);cursor:pointer;width:36px;background:var(--color-white);color:{{ redoFg }}" style-hover="background:var(--color-paper)"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="redo-2" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+          <button type="button" onClick="{{ reset }}" aria-label="Reset all picks" title="Reset all picks" style="flex:none;white-space:nowrap;min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);cursor:pointer;width:36px;background:var(--color-white);color:var(--color-ink)" style-hover="background:var(--color-paper)"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="rotate-ccw" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+        </div>
+        <button type="button" onClick="{{ copyLink }}" style="flex:none;white-space:nowrap;min-height:36px;display:flex;align-items:center;gap:6px;padding:0 12px;border:1px solid var(--color-eucalyptus);border-radius:8px;background:var(--color-eucalyptus);color:var(--color-white);font:600 14px/1 var(--font-body);cursor:pointer;transition:background 150ms cubic-bezier(.2,.8,.2,1)" style-hover="background:var(--color-eucalyptus-hover)">
+          <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="link" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+          <span style="display:{{ copyLabel }}">Copy link</span>
+        </button>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--color-border-subtle);background:var(--color-white)">
+      <div style="max-width:1248px;margin:0 auto;padding:6px clamp(16px,4vw,48px);display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px">
+        <div role="group" aria-label="View" style="flex:1 1 260px;max-width:{{ viewMax }};display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden;align-self:flex-end">
+          <sc-for list="{{ viewOpts }}" as="o" hint-placeholder-count="2">
+            <button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.sel }}" style="flex:1 1 0;white-space:nowrap;min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);cursor:pointer;padding:0 10px;background:{{ o.bg }};color:{{ o.fg }}" style-hover="text-decoration:underline">
+              <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="{{ o.icon }}" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+              <span>{{ o.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div role="group" aria-label="Pool filter" style="flex:1 1 300px;max-width:{{ poolMax }};display:{{ dFilters }};flex-direction:column;gap:4px">
+          <span style="font-size:11px;line-height:1;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted)">Pool</span>
+          <div style="display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden">
+            <sc-for list="{{ poolFilters }}" as="o" hint-placeholder-count="7">
+              <button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.sel }}" style="flex:1 1 0;white-space:nowrap;min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);cursor:pointer;min-width:34px;padding:0 10px;background:{{ o.bg }};color:{{ o.fg }}" style-hover="text-decoration:underline">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div style="max-width:1248px;margin:0 auto;padding:{{ mainPad }} clamp(16px,4vw,48px) 0">
+    <div style="display:{{ dPoolGrid }}">
+      <dc-import name="PoolsByPool" pools="{{ poolsByPool }}" on-pick="{{ pick }}" on-details="{{ openDetails }}" pick-style="{{ pickStyle }}" narrow="{{ stack }}" hint-size="100%,1200px"></dc-import>
+    </div>
+
+    <div style="display:{{ dPoolTl }};flex-wrap:wrap;gap:48px;align-items:flex-start">
+      <div style="flex:999 1 560px;min-width:0">
+        <dc-import name="Timeline" narrow="{{ narrow }}" groups="{{ poolTimeline }}" on-pick="{{ pick }}" on-details="{{ openDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,1200px"></dc-import>
+      </div>
+      <aside style="flex:1 1 260px;position:sticky;top:112px;display:flex;flex-direction:column;gap:16px">
+        <span style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted)">Standings</span>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 16px">
+          <sc-for list="{{ compactTables }}" as="t" hint-placeholder-count="6">
+            <dc-import name="PoolTable" narrow="{{ narrow }}" compact="{{ true }}" title="{{ t.name }}" rows="{{ t.table }}" hint-size="100%,150px"></dc-import>
+          </sc-for>
+        </div>
+        </aside>
+    </div>
+
+    <div style="display:{{ dKoRounds }}">
+      <dc-import name="KnockoutRounds" stages="{{ koStages }}" on-pick="{{ pick }}" on-details="{{ openDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,1200px"></dc-import>
+    </div>
+
+    <div style="display:{{ dKoTl }};flex-wrap:wrap;gap:48px;align-items:flex-start">
+      <div style="flex:999 1 560px;min-width:0">
+        <dc-import name="Timeline" narrow="{{ narrow }}" groups="{{ koTimeline }}" on-pick="{{ pick }}" on-details="{{ openDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,1200px"></dc-import>
+      </div>
+      <aside style="flex:1 1 260px;position:sticky;top:112px;display:flex;flex-direction:column;gap:16px">
+        <div style="background:var(--color-eucalyptus);color:var(--color-white);border-radius:12px;padding:16px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-sun)">
+            <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="trophy" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+            <span>Your champion</span>
+          </div>
+          <div style="font:700 32px/1 var(--font-display);text-transform:uppercase;margin-top:8px">{{ championText }}</div>
+        </div>
+        <div style="background:var(--color-white);border:1px solid var(--color-border-subtle);border-radius:12px;padding:8px 16px">
+          <sc-for list="{{ finish }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--color-border-subtle);font-size:15px">
+              <span style="color:var(--color-muted)">{{ r.label }}</span>
+              <span style="font-weight:600;text-align:right">{{ r.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </aside>
+    </div>
+
+    <div style="display:{{ dKoBr }}">
+      <dc-import name="KnockoutBracket" narrow="{{ narrow }}" headers="{{ brHeaders }}" r16="{{ brR16 }}" qf="{{ brQf }}" sf="{{ brSf }}" final="{{ brFinal }}" bronze="{{ brBronze }}" champion="{{ champion }}" on-pick="{{ pick }}" on-details="{{ openDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,1150px"></dc-import>
+    </div>
+
+    <footer style="margin-top:48px;padding:16px 0 32px;border-top:1px solid var(--color-border-subtle);display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.5;color:var(--color-muted)">
+      <p style="margin:0">Kickoff times are local to you. Everything happens in your browser. Share your predictions with the link.</p>
+      <details>
+        <summary style="cursor:pointer;color:var(--color-eucalyptus);font-weight:600">Provisional 2027 rules &amp; suggested outcomes</summary>
+        <p style="margin:8px 0 0;max-width:68ch">A win earns 4 points and a draw 2. Teams earn a bonus point for scoring four or more tries, and another for losing by seven points or fewer. Picking a winner assumes a 5-point margin and 3 – 2 tries; open Details to change the margin and tries. Pools are ranked on points, then points difference, then tries. A check marks a qualifying team: the top two in each pool plus the four best third-place teams. These are provisional 2027 qualification rules.</p>
+      </details>
+      <p style="margin:0">An independent project. Not affiliated with or endorsed by World Rugby or Rugby World Cup Limited.</p>
+    </footer>
+  </div>
+
+  <sc-if value="{{ dlgOpen }}">
+    <div class="sm-dialog__scrim" onClick="{{ scrimClick }}">
+      <div class="sm-dialog" role="dialog" aria-modal="true" aria-label="{{ dlgTitle }}" style="width:min(100%,420px);padding:16px;border-radius:20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="min-width:0">
+            <div style="font-size:18px;line-height:1.2;font-weight:700">{{ dlgTitle }}</div>
+            <div style="font-size:13px;color:var(--color-muted);margin-top:2px">{{ dlgMeta }}</div>
+          </div>
+          <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.IconButton" icon="x" label="Close" variant="ghost" size="sm" on-click="{{ closeDlg }}" hint-size="44px,44px"></x-import>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted)">Winner</span>
+          <div style="display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden;min-width:0">
+          <sc-for list="{{ winOpts }}" as="o" hint-placeholder-count="2">
+            <button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.sel }}" style="flex:1 1 0;white-space:nowrap;min-height:34px;padding:0 8px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);font-variant-numeric:tabular-nums;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};" style-hover="text-decoration:underline">{{ o.label }}</button>
+          </sc-for>
+        </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted)">Margin</span>
+          <div style="display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden;min-width:0">
+          <sc-for list="{{ marginOpts }}" as="o" hint-placeholder-count="5">
+            <button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.sel }}" style="flex:1 1 0;white-space:nowrap;min-height:34px;padding:0 8px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);font-variant-numeric:tabular-nums;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};" style-hover="text-decoration:underline">{{ o.label }}</button>
+          </sc-for>
+        </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted)">Tries</span>
+          <sc-for list="{{ triesRows }}" as="r" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;align-items:center">
+              <span style="font-size:14px;font-weight:600;min-width:0">{{ r.team }}</span>
+              <div style="display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden;min-width:0">
+                <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="7">
+                  <button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.sel }}" style="flex:1 1 0;white-space:nowrap;min-height:34px;padding:0 8px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);font-variant-numeric:tabular-nums;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};padding:0 4px" style-hover="text-decoration:underline">{{ o.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--color-border-subtle)">
+          <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Button" variant="ghost" size="sm" on-click="{{ clearPick }}" hint-size="100px,44px">Clear pick</x-import>
+          <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Button" variant="brand" size="sm" on-click="{{ saveDetails }}" hint-size="80px,44px">Done</x-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toast }}">
+    <div style="position:fixed;right:24px;bottom:24px;z-index:120">
+      <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Toast" tone="success" title="{{ toast }}" on-close="{{ closeToast }}" hint-size="360px,72px">Anyone with the link sees your picks.</x-import>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultPoolView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;pool&quot;,&quot;timeline&quot;],&quot;default&quot;:&quot;pool&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Views&quot;},&quot;defaultKoView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rounds&quot;,&quot;timeline&quot;,&quot;bracket&quot;],&quot;default&quot;:&quot;rounds&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Views&quot;},&quot;pickStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;filled&quot;,&quot;outline&quot;],&quot;default&quot;:&quot;filled&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Picks&quot;}}">
+const TEAMS = { NZL: 'New Zealand', AUS: 'Australia', HKG: 'Hong Kong China', CHI: 'Chile', RSA: 'South Africa', ITA: 'Italy', GEO: 'Georgia', ROU: 'Romania', ARG: 'Argentina', FIJ: 'Fiji', CAN: 'Canada', ESP: 'Spain', IRE: 'Ireland', SCO: 'Scotland', POR: 'Portugal', URU: 'Uruguay', FRA: 'France', JPN: 'Japan', USA: 'USA', SAM: 'Samoa', ENG: 'England', WAL: 'Wales', TGA: 'Tonga', ZIM: 'Zimbabwe' };
+const POOLS = { A: ['NZL', 'AUS', 'HKG', 'CHI'], B: ['RSA', 'ITA', 'GEO', 'ROU'], C: ['ARG', 'FIJ', 'CAN', 'ESP'], D: ['IRE', 'SCO', 'POR', 'URU'], E: ['FRA', 'JPN', 'USA', 'SAM'], F: ['ENG', 'WAL', 'TGA', 'ZIM'] };
+const FLAG = { NZL: 'nz', AUS: 'au', HKG: 'hk', CHI: 'cl', RSA: 'za', ITA: 'it', GEO: 'ge', ROU: 'ro', ARG: 'ar', FIJ: 'fj', CAN: 'ca', ESP: 'es', IRE: 'ie', SCO: 'gb-sct', POR: 'pt', URU: 'uy', FRA: 'fr', JPN: 'jp', USA: 'us', SAM: 'ws', ENG: 'gb-eng', WAL: 'gb-wls', TGA: 'to', ZIM: 'zw' };
+const COLOR = { NZL: '#1A1A1A', AUS: '#00703A', HKG: '#B0102C', CHI: '#0033A0', RSA: '#006B42', ITA: '#005BA3', GEO: '#B30E29', ROU: '#002B7F', ARG: '#2A6496', FIJ: '#1B4F8A', CAN: '#B30E29', ESP: '#A3141A', IRE: '#006B44', SCO: '#0A2A5E', POR: '#8B0D1E', URU: '#2A5599', FRA: '#0B2A6B', JPN: '#B0002A', USA: '#1F2A5C', SAM: '#0B3D91', ENG: '#A81C2C', WAL: '#B30E29', TGA: '#B00000', ZIM: '#00612E' };
+const flagUrl = (c) => c ? 'https://flagcdn.com/w40/' + FLAG[c] + '.png' : '';
+const RANK = ['RSA', 'AUS', 'FRA', 'ARG', 'NZL', 'IRE', 'ENG', 'FIJ', 'SCO', 'WAL', 'JPN', 'ITA', 'GEO', 'POR', 'USA', 'TGA', 'SAM', 'CAN', 'URU', 'ROU', 'HKG', 'ESP', 'CHI', 'ZIM'];
+const parse = (s) => s.trim().split('\n').map(l => { const [no, g, d, time, h, a] = l.trim().split('|'); return { no: +no, g, d, time, h, a }; });
+const PM = parse(`1|A|10-01|12:45|AUS|HKG
+2|F|10-02|04:45|WAL|ZIM
+3|A|10-02|07:15|NZL|CHI
+4|E|10-02|09:45|FRA|USA
+5|F|10-02|12:15|ENG|TGA
+6|E|10-03|03:15|JPN|SAM
+7|B|10-03|05:45|RSA|ITA
+8|D|10-03|08:15|SCO|URU
+9|B|10-03|12:15|GEO|ROU
+10|C|10-04|05:15|FIJ|ESP
+11|D|10-04|08:15|IRE|POR
+12|C|10-04|10:45|ARG|CAN
+13|F|10-08|03:15|WAL|TGA
+14|F|10-08|11:45|ENG|ZIM
+15|E|10-09|08:15|USA|SAM
+16|A|10-09|06:10|NZL|AUS
+17|E|10-09|10:45|FRA|JPN
+18|A|10-09|12:15|CHI|HKG
+19|C|10-10|03:45|FIJ|CAN
+20|C|10-10|06:15|ARG|ESP
+21|B|10-10|08:45|RSA|GEO
+22|D|10-10|11:45|IRE|SCO
+23|D|10-11|08:15|URU|POR
+24|B|10-11|10:45|ITA|ROU
+25|A|10-13|08:15|NZL|HKG
+26|E|10-13|11:30|JPN|USA
+27|F|10-13|12:15|TGA|ZIM
+28|C|10-16|04:15|ARG|FIJ
+29|A|10-16|07:10|AUS|CHI
+30|F|10-16|10:45|ENG|WAL
+31|C|10-16|12:15|ESP|CAN
+32|B|10-17|03:15|ITA|GEO
+33|D|10-17|05:45|IRE|URU
+34|D|10-17|08:15|SCO|POR
+35|E|10-17|10:45|FRA|SAM
+36|B|10-17|13:15|RSA|ROU`);
+const KO = parse(`37|R16|10-23|05:15|C2|F2
+38|R16|10-23|07:45|A1|T0
+39|R16|10-23|10:15|E1|D2
+40|R16|10-23|12:45|B1|T1
+41|R16|10-24|05:15|C1|T2
+42|R16|10-24|07:45|D1|T3
+43|R16|10-24|10:15|A2|E2
+44|R16|10-24|12:45|F1|B2
+45|QF|10-30|07:45|W38|W40
+46|QF|10-30|10:45|W37|W39
+47|QF|10-31|08:00|W41|W42
+48|QF|10-31|11:00|W43|W44
+49|SF|11-05|11:00|W45|W46
+50|SF|11-06|11:00|W47|W48
+51|BR|11-12|10:45|L49|L50
+52|F|11-13|11:00|W49|W50`);
+const KOBY = {}; KO.forEach(k => { KOBY[k.no] = k; });
+const STAGE = { R16: ['Round of 16', '23 – 24 Oct'], QF: ['Quarter-finals', '30 – 31 Oct'], SF: ['Semi-finals', '5 – 6 Nov'], BR: ['Bronze final', '12 Nov'], F: ['Final', '13 Nov'] };
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dt = (d) => { const [m, dd] = d.split('-').map(Number); return { day: dd, mon: MON[m - 1], dow: DOW[new Date(2027, m - 1, dd).getDay()], label: dd + ' ' + MON[m - 1] }; };
+const NEXT = {};
+KO.forEach(k => [k.h, k.a].forEach(r => { if (r[0] === 'W' || r[0] === 'L') (NEXT[+r.slice(1)] = NEXT[+r.slice(1)] || []).push({ to: k.no, t: r[0] }); }));
+const note = (no) => { const n = NEXT[no]; if (!n) return 'Winner is your champion'; return n.map(x => x.t === 'L' ? 'loser to the Bronze final' : (x.to === 52 ? 'winner to the Final' : 'winner to Match ' + x.to)).join(', ').replace(/^./, c => c.toUpperCase()); };
+const ph = (ref) => { const c = ref[0]; if (c === 'W') return 'Winner M' + ref.slice(1); if (c === 'L') return 'Loser M' + ref.slice(1); if (c === 'T') return 'Best third place'; return (ref[1] === '1' ? 'Winner Pool ' : 'Runner-up Pool ') + c; };
+const scoreFor = (w, m) => w === 'd' ? [20, 20] : w === 'h' ? [17 + m, 17] : [17, 17 + m];
+const marginOf = (k) => { if (!k || k.w === 'd') return 0; const d = Math.abs(k.s[0] - k.s[1]); return d >= 20 ? 20 : d >= 15 ? 15 : d >= 10 ? 10 : 5; };
+const mLabel = (m) => m === 20 ? '20+' : String(m);
+const dflt = (w) => ({ w, s: scoreFor(w, 5), t: w === 'h' ? [3, 2] : w === 'a' ? [2, 3] : [2, 2] });
+const diff = (r) => r.pf - r.pa;
+function perms(a) { if (a.length <= 1) return [a]; const out = []; a.forEach((x, i) => perms(a.slice(0, i).concat(a.slice(i + 1))).forEach(p => out.push([x].concat(p)))); return out; }
+
+function compute(picks) {
+  const tables = {}, cnt = {}, done = {};
+  for (const p in POOLS) { tables[p] = POOLS[p].map((code, seed) => ({ code, seed, p: 0, w: 0, d: 0, l: 0, pf: 0, pa: 0, tf: 0, pts: 0 })); cnt[p] = 0; }
+  PM.forEach(m => {
+    const k = picks[m.no]; if (!k || !k.w) return; cnt[m.g]++;
+    const T = tables[m.g], H = T.find(r => r.code === m.h), A = T.find(r => r.code === m.a);
+    [[H, k.s[0], k.s[1], k.t[0]], [A, k.s[1], k.s[0], k.t[1]]].forEach(([r, f, a, t]) => {
+      r.p++; r.pf += f; r.pa += a; r.tf += t; if (t >= 4) r.pts++;
+      if (f > a) { r.w++; r.pts += 4; } else if (f === a) { r.d++; r.pts += 2; } else { r.l++; if (a - f <= 7) r.pts++; }
+    });
+  });
+  const cmp = (a, b) => (b.pts - a.pts) || (diff(b) - diff(a)) || (b.tf - a.tf);
+  for (const p in POOLS) { tables[p].sort((a, b) => cmp(a, b) || (a.seed - b.seed)); done[p] = cnt[p] === 6; }
+  const allDone = Object.keys(POOLS).every(p => done[p]);
+  let thirds = null; const best = new Set();
+  if (allDone) {
+    const th = Object.keys(POOLS).map(p => Object.assign({ pool: p }, tables[p][2])).sort((a, b) => cmp(a, b) || (RANK.indexOf(a.code) - RANK.indexOf(b.code))).slice(0, 4);
+    th.forEach(t => best.add(t.code));
+    const hosts = ['A', 'B', 'C', 'D'];
+    const pm = perms(th).find(pp => pp.every((t, i) => t.pool !== hosts[i])) || th;
+    thirds = pm.map(t => t.code);
+  }
+  const ko = {};
+  const res = (ref) => {
+    const c = ref[0];
+    if (c === 'W' || c === 'L') { const r = ko[+ref.slice(1)]; return r ? (c === 'W' ? r.win : r.lose) : null; }
+    if (c === 'T') return thirds ? thirds[+ref[1]] : null;
+    return done[c] ? tables[c][+ref[1] - 1].code : null;
+  };
+  KO.forEach(k => {
+    const h = res(k.h), a = res(k.a), p = picks[k.no]; let win = null, lose = null;
+    if (h && a && p && (p.w === 'h' || p.w === 'a')) { win = p.w === 'h' ? h : a; lose = p.w === 'h' ? a : h; }
+    ko[k.no] = { h, a, win, lose };
+  });
+  return { tables, cnt, done, best, ko, allDone };
+}
+function seedPicks() {
+  const picks = {};
+  PM.forEach(m => { const P = POOLS[m.g]; picks[m.no] = dflt(P.indexOf(m.h) < P.indexOf(m.a) ? 'h' : 'a'); });
+  KO.forEach(k => { const r = compute(picks).ko[k.no]; picks[k.no] = dflt(RANK.indexOf(r.h) < RANK.indexOf(r.a) ? 'h' : 'a'); });
+  return picks;
+}
+const encode = (picks) => { const out = []; for (let i = 1; i <= 52; i++) { const k = picks[i]; out.push(k ? k.w + k.s.join('.') + '.' + k.t.join('.') : ''); } return out.join(','); };
+const decode = (str) => { const picks = {}; str.split(',').forEach((x, i) => { if (!x) return; const n = x.slice(1).split('.').map(Number); if (n.length === 4 && n.every(v => !isNaN(v))) picks[i + 1] = { w: x[0], s: [n[0], n[1]], t: [n[2], n[3]] }; }); return picks; };
+const LS = 'rwc-predictor-picks-v1';
+function loadPicks() {
+  try { const m = (location.hash || '').match(/p=([^&]+)/); if (m) return decode(decodeURIComponent(m[1])); } catch (e) {}
+  try { const s = localStorage.getItem(LS); if (s != null) return decode(s); } catch (e) {}
+  return seedPicks();
+}
+
+class Component extends DCLogic {
+  state = {
+    picks: loadPicks(), past: [], future: [], tab: 'pools',
+    poolView: this.props.defaultPoolView || 'pool', koView: this.props.defaultKoView || 'rounds',
+    filter: 'all', dlg: null, draft: null, toast: '', narrow: typeof window !== 'undefined' && window.innerWidth < 720, stack: typeof window !== 'undefined' && window.innerWidth < 960,
+  };
+  commit(next) {
+    this.setState(s => ({ picks: next, past: s.past.slice(-99).concat([s.picks]), future: [] }));
+    try { localStorage.setItem(LS, encode(next)); } catch (e) {}
+  }
+  pick = (no, side) => {
+    const p = this.state.picks, cur = p[no], next = Object.assign({}, p);
+    if (cur && cur.w === side) delete next[no]; else next[no] = dflt(side);
+    this.commit(next);
+  };
+  openDetails = (no) => {
+    this._live = false;
+    const k = this.state.picks[no];
+    const cl = (v) => Math.max(1, Math.min(7, v));
+    this.setState({ dlg: no, draft: k ? { w: k.w, m: marginOf(k) || 5, t: [cl(k.t[0]), cl(k.t[1])] } : { w: null, m: 5, t: [2, 2] } });
+  };
+  setDraft(patch) {
+    const d = Object.assign({}, this.state.draft, patch), no = this.state.dlg;
+    this.setState({ draft: d });
+    if (!d.w || !no) return;
+    const next = Object.assign({}, this.state.picks, { [no]: { w: d.w, s: scoreFor(d.w, d.m), t: d.t.slice() } });
+    if (!this._live) { this._live = true; this.commit(next); }
+    else { this.setState({ picks: next }); try { localStorage.setItem(LS, encode(next)); } catch (e) {} }
+  }
+  onKey = (e) => { if (e.key === 'Escape' && this.state.dlg) this.setState({ dlg: null }); };
+  onResize = () => { const w = window.innerWidth, n = w < 720, s = w < 960; if (n !== this.state.narrow || s !== this.state.stack) this.setState({ narrow: n, stack: s }); };
+  componentDidMount() { window.addEventListener('keydown', this.onKey); window.addEventListener('resize', this.onResize); this.onResize(); }
+  undo = () => this.setState(s => { if (!s.past.length) return null; const prev = s.past[s.past.length - 1]; try { localStorage.setItem(LS, encode(prev)); } catch (e) {} return { picks: prev, past: s.past.slice(0, -1), future: [s.picks].concat(s.future) }; });
+  redo = () => this.setState(s => { if (!s.future.length) return null; const nx = s.future[0]; try { localStorage.setItem(LS, encode(nx)); } catch (e) {} return { picks: nx, future: s.future.slice(1), past: s.past.concat([s.picks]) }; });
+  componentWillUnmount() { clearTimeout(this._t); window.removeEventListener('keydown', this.onKey); window.removeEventListener('resize', this.onResize); }
+
+  renderVals() {
+    const st = this.state, picks = st.picks, c = compute(picks), ps = this.props.pickStyle || 'filled';
+    const mk = (m, h, a, isKO, meta) => {
+      const k = picks[m.no], both = !!(h && a), w = both && k ? k.w : null, D = dt(m.d);
+      return {
+        no: m.no, d: m.d, head: 'Match ' + m.no, dateTime: D.label + ' · ' + m.time, time: m.time, rowMeta: meta,
+        home: { flag: flagUrl(h), color: h ? COLOR[h] : '', code: h || '', label: h ? TEAMS[h] : ph(m.h), known: !!h, sel: w === 'h' },
+        away: { flag: flagUrl(a), color: a ? COLOR[a] : '', code: a || '', label: a ? TEAMS[a] : ph(m.a), known: !!a, sel: w === 'a' },
+        allowDraw: !isKO, drawSel: w === 'd', picked: !!w, canDetails: both,
+        scoreText: w ? (w === 'd' ? 'Draw' : 'by ' + mLabel(marginOf(k))) : '', triesText: w ? k.t[0] + ' – ' + k.t[1] + ' tries' : '',
+        hs: w === 'h' ? '+' + mLabel(marginOf(k)) : '', as: w === 'a' ? '+' + mLabel(marginOf(k)) : '',
+        emptyText: both ? 'No pick yet' : 'Waiting on earlier picks', note: isKO ? note(m.no) : '',
+      };
+    };
+    const poolVm = {}; PM.forEach(m => { poolVm[m.no] = mk(m, m.h, m.a, false, 'Pool ' + m.g + ' · M' + m.no); });
+    const koVm = {}; KO.forEach(k => { const r = c.ko[k.no]; koVm[k.no] = mk(k, r.h, r.a, true, (k.g === 'R16' ? 'R16' : k.g === 'F' ? 'Final' : k.g === 'BR' ? 'Bronze' : k.g) + ' · M' + k.no); });
+    const tableRows = (p) => c.tables[p].map((r, i) => ({
+      pos: i + 1, code: r.code, name: TEAMS[r.code], p: r.p, w: r.w, d: r.d, l: r.l, pts: r.pts,
+      diffText: (diff(r) > 0 ? '+' : '') + diff(r), qual: c.done[p] && (i < 2 || (i === 2 && c.best.has(r.code))),
+      qualLabel: i < 2 ? 'Qualifies' : 'Qualifies as a best third-place team',
+    }));
+    const poolIds = Object.keys(POOLS).filter(p => st.filter === 'all' || st.filter === p);
+    const poolsByPool = poolIds.map(p => ({ name: 'Pool ' + p, pickedText: c.cnt[p] + ' / 6 picked', table: tableRows(p), matches: PM.filter(m => m.g === p).map(m => poolVm[m.no]) }));
+    const compactTables = Object.keys(POOLS).map(p => ({ name: 'Pool ' + p, table: tableRows(p) }));
+    const byDay = (vms) => {
+      const days = [], idx = {};
+      vms.slice().sort((a, b) => (a.d + a.time).localeCompare(b.d + b.time)).forEach(v => {
+        if (!idx[v.d]) { const D = dt(v.d); idx[v.d] = { key: v.d, dayNum: String(D.day).padStart(2, '0'), dow: D.dow, mon: D.mon, matches: [] }; days.push(idx[v.d]); }
+        idx[v.d].matches.push(v);
+      });
+      return days;
+    };
+    const pickedOf = (vms) => vms.filter(v => v.picked).length + ' / ' + vms.length + ' picked';
+    const poolTimeline = [[1, 12, '1 – 4 Oct'], [13, 24, '8 – 11 Oct'], [25, 36, '13 – 17 Oct']].map(([a, b, range], i) => {
+      const vms = PM.filter(m => m.no >= a && m.no <= b && (st.filter === 'all' || m.g === st.filter)).map(m => poolVm[m.no]);
+      return { label: 'Round ' + (i + 1), range, meta: pickedOf(vms), days: byDay(vms) };
+    }).filter(g => g.days.length);
+    const koStages = ['R16', 'QF', 'SF', 'BR', 'F'].map(g => { const vms = KO.filter(k => k.g === g).map(k => koVm[k.no]); return { label: STAGE[g][0], range: STAGE[g][1], meta: pickedOf(vms), matches: vms }; });
+    const koTimeline = [['R16'], ['QF'], ['SF'], ['BR', 'F']].map(gs => {
+      const vms = KO.filter(k => gs.indexOf(k.g) >= 0).map(k => koVm[k.no]);
+      return { label: gs.length > 1 ? 'Finals weekend' : STAGE[gs[0]][0], range: gs.length > 1 ? '12 – 13 Nov' : STAGE[gs[0]][1], meta: pickedOf(vms), days: byDay(vms) };
+    });
+    const grp = (pairs) => pairs.map(pr => ({ items: pr.map(n => koVm[n]) }));
+    const nm = (code) => code ? TEAMS[code] : '—';
+    const ko = c.ko, champion = ko[52].win ? TEAMS[ko[52].win] : '';
+    const poolPicked = PM.filter(m => picks[m.no] && picks[m.no].w).length;
+    const koPicked = KO.filter(k => koVm[k.no].picked).length;
+    const koLocked = !c.allDone;
+    const isPools = st.tab === 'pools' || koLocked;
+    const seg = (sel) => ({ bg: sel ? 'var(--color-ink)' : 'var(--color-white)', fg: sel ? 'var(--color-white)' : 'var(--color-ink)' });
+    const opt = (key, v, label, icon) => Object.assign({ label, icon, sel: st[key] === v, onClick: () => this.setState({ [key]: v }) }, seg(st[key] === v));
+    const stage = (sel, done, n) => ({ fg: sel ? 'var(--color-ink)' : 'var(--color-muted)', bar: sel ? 'inset 0 -3px 0 var(--color-clay)' : 'none',
+      dotBg: done ? 'var(--color-eucalyptus)' : 'var(--color-white)', dotFg: done ? 'var(--color-white)' : 'var(--color-ink)', dotBd: done ? 'var(--color-eucalyptus)' : 'var(--color-border-strong)', dot: done ? '✓' : n });
+    const sP = stage(isPools, c.allDone, '1'), sK = stage(!isPools, koPicked === 16, '2');
+    const left = 36 - poolPicked;
+    const show = (on, how) => on ? (how || 'block') : 'none';
+    const setView = (key, v) => () => this.setState({ [key]: v });
+    const dl = st.dlg, dIsKO = dl > 36, dm = dl ? (dIsKO ? KOBY[dl] : PM[dl - 1]) : null;
+    const dH = dl ? (dIsKO ? ko[dl].h : dm.h) : null, dA = dl ? (dIsKO ? ko[dl].a : dm.a) : null;
+    const draft = st.draft || { w: null, m: 5, t: [2, 2] };
+    const sgs = (sel) => ({ bg: sel ? 'var(--color-ink)' : 'var(--color-white)', fg: sel ? 'var(--color-white)' : 'var(--color-ink)' });
+    const winOpts = dl ? [['h', dH], ['a', dA]].map(([w, code]) => Object.assign({ label: nm(code), sel: draft.w === w, onClick: () => this.setDraft({ w, m: draft.w === 'd' ? 5 : draft.m }) }, sgs(draft.w === w))) : [];
+    const marginOpts = [20, 15, 10, 5].map(m => Object.assign({ label: 'by ' + mLabel(m), sel: draft.w && draft.w !== 'd' && draft.m === m, onClick: () => this.setDraft({ m, w: draft.w && draft.w !== 'd' ? draft.w : null }) }, sgs(draft.w && draft.w !== 'd' && draft.m === m)))
+      .concat(dl && !dIsKO ? [Object.assign({ label: 'Draw', sel: draft.w === 'd', onClick: () => this.setDraft({ w: 'd' }) }, sgs(draft.w === 'd'))] : []);
+    const triesRows = dl ? [0, 1].map(i => ({ team: nm(i ? dA : dH), opts: [1, 2, 3, 4, 5, 6, 7].map(n => Object.assign({ label: n === 7 ? '7+' : String(n), sel: draft.t[i] === n, onClick: () => { const t = draft.t.slice(); t[i] = n; this.setDraft({ t }); } }, sgs(draft.t[i] === n))) })) : [];
+    return {
+      narrow: st.narrow, stack: st.stack, barPos: st.narrow ? 'static' : 'sticky', navOrder: st.narrow ? 3 : 1, navFlex: st.narrow ? '1 0 100%' : '0 0 auto', navJustify: st.narrow ? 'space-between' : 'flex-start',
+      copyLabel: st.narrow ? 'none' : 'inline', barGap: st.narrow ? '8px' : '24px', wmSize: st.narrow ? 16 : 18, mainPad: st.narrow ? '12px' : '24px', viewMax: st.narrow ? 'none' : '360px', poolMax: st.narrow ? 'none' : '440px',
+      pickStyle: ps, pick: this.pick, openDetails: this.openDetails,
+      undoFg: st.past.length ? 'var(--color-ink)' : 'var(--color-border-strong)', redoFg: st.future.length ? 'var(--color-ink)' : 'var(--color-border-strong)',
+      noUndo: !st.past.length, noRedo: !st.future.length, undo: this.undo, redo: this.redo,
+      reset: () => this.commit({}),
+      copyLink: () => {
+        const url = location.href.split('#')[0] + '#p=' + encodeURIComponent(encode(picks));
+        try { history.replaceState(null, '', url); } catch (e) {}
+        try { navigator.clipboard && navigator.clipboard.writeText(url).catch(() => {}); } catch (e) {}
+        this.setState({ toast: 'Link copied' }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 3000);
+      },
+      toast: st.toast, closeToast: () => this.setState({ toast: '' }),
+      goPools: () => this.setState({ tab: 'pools' }), goKo: () => this.setState({ tab: 'ko' }),
+      selPools: isPools, selKo: !isPools, koLocked, koOpen: !koLocked,
+      koTip: 'Pick ' + left + ' more pool ' + (left === 1 ? 'match' : 'matches') + ' to allocate knockout teams',
+      poolCount: poolPicked + '/36', koCount: koPicked + '/16',
+      poolsFg: sP.fg, poolsBar: sP.bar, poolsDotBg: sP.dotBg, poolsDotFg: sP.dotFg, poolsDotBd: sP.dotBd, poolsDot: sP.dot,
+      koFg: sK.fg, koBar: sK.bar, koDotBg: sK.dotBg, koDotFg: sK.dotFg, koDotBd: sK.dotBd, koDot: sK.dot,
+      viewOpts: isPools
+        ? [opt('poolView', 'pool', 'By pool', 'layout-grid'), opt('poolView', 'timeline', 'Timeline', 'calendar-range')]
+        : [opt('koView', 'rounds', 'Rounds', 'rows-3'), opt('koView', 'timeline', 'Timeline', 'calendar-range'), opt('koView', 'bracket', 'Bracket', 'network')],
+      dFilters: show(isPools, 'flex'),
+      dPoolGrid: show(isPools && st.poolView === 'pool'), dPoolTl: show(isPools && st.poolView === 'timeline', 'flex'),
+      dKoRounds: show(!isPools && st.koView === 'rounds'), dKoTl: show(!isPools && st.koView === 'timeline', 'flex'), dKoBr: show(!isPools && st.koView === 'bracket'),
+      poolFilters: ['all'].concat(Object.keys(POOLS)).map(id => Object.assign({ label: id === 'all' ? 'All' : id, sel: st.filter === id, onClick: () => this.setState({ filter: id }) }, seg(st.filter === id))),
+      poolsByPool, poolTimeline, compactTables, koStages, koTimeline,
+      brHeaders: [{ label: 'Round of 16', range: '23 – 24 Oct' }, { label: 'Quarter-finals', range: '30 – 31 Oct' }, { label: 'Semi-finals', range: '5 – 6 Nov' }, { label: 'Final', range: '13 Nov' }],
+      brR16: grp([[38, 40], [37, 39], [41, 42], [43, 44]]), brQf: grp([[45, 46], [47, 48]]), brSf: grp([[49, 50]]),
+      brFinal: koVm[52], brBronze: koVm[51], champion,
+      championText: champion || 'Not picked yet',
+      finish: [
+        { label: 'Runner-up', value: champion ? nm(ko[52].lose) : '—' },
+        { label: 'Bronze', value: ko[51].win ? nm(ko[51].win) : '—' },
+        { label: 'Fourth', value: ko[51].lose ? nm(ko[51].lose) : '—' },
+        { label: 'Semi-finalists', value: [ko[49].h, ko[49].a, ko[50].h, ko[50].a].filter(Boolean).map(x => x).join(', ') || '—' },
+      ],
+      dlgOpen: !!dl, dlgTitle: dl ? nm(dH) + ' v ' + nm(dA) : '',
+      dlgMeta: dl ? 'Match ' + dl + ' · ' + (dIsKO ? STAGE[dm.g][0] : 'Pool ' + dm.g) + ' · ' + dt(dm.d).label + ', ' + dm.time : '',
+      winOpts, marginOpts, triesRows,
+      scrimClick: (e) => { if (e.target === e.currentTarget) this.setState({ dlg: null }); },
+      closeDlg: () => this.setState({ dlg: null }),
+      clearPick: () => { const n = Object.assign({}, picks); delete n[dl]; this.commit(n); this.setState({ dlg: null }); },
+      saveDetails: () => this.setState({ dlg: null }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,27 +1,37 @@
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { createBrowserController } from "./state/browser";
-import type { ResolvedFixture, Stage } from "./domain/types";
-import { FixtureCard } from "./components/FixtureCard";
-import { StandingsTable } from "./components/StandingsTable";
+import { Icon } from "./components/Icon";
+import { MatchDetailsDialog } from "./components/MatchDetailsDialog";
+import { KnockoutBracket, KnockoutRounds, PoolsByPool, Timeline } from "./components/TournamentViews";
 import "./App.css";
-
-const stageNames: Record<Stage, string> = {
-  pool: "Pools", round16: "Round of 16", quarter: "Quarter-finals",
-  semi: "Semi-finals", bronze: "Bronze final", final: "Final",
-};
-const stages: Stage[] = ["round16", "quarter", "semi", "bronze", "final"];
 
 function App() {
   const browser = createBrowserController();
   const controller = browser.controller;
   const [state, setState] = createSignal(controller.getState());
   const [urlError, setUrlError] = createSignal(browser.urlError());
-  const [view, setView] = createSignal<"pools" | "knockout">("pools");
+  const [phase, setPhase] = createSignal<"pools" | "knockout">("pools");
+  const [poolView, setPoolView] = createSignal<"pool" | "timeline">("pool");
+  const [knockoutView, setKnockoutView] = createSignal<"rounds" | "timeline" | "bracket">("rounds");
+  const [poolFilter, setPoolFilter] = createSignal("all");
+  const [activeFixtureId, setActiveFixtureId] = createSignal<number>();
   const [copyStatus, setCopyStatus] = createSignal("");
   const [manualUrl, setManualUrl] = createSignal("");
+  let detailTrigger: HTMLElement | undefined;
+  let loadedTournament = controller.getState().scenario.tournamentId;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
+  const closeDetails = () => { controller.finishGroup(); setActiveFixtureId(undefined); };
+  const openDetails = (id: number, trigger: HTMLButtonElement) => {
+    if (urlError()) return;
+    controller.finishGroup(); detailTrigger = trigger; setActiveFixtureId(id);
+  };
   const unsubscribe = browser.subscribe(() => {
-    setState(controller.getState()); setUrlError(browser.urlError());
+    const next = controller.getState();
+    if (browser.urlError() || next.scenario.tournamentId !== loadedTournament) {
+      closeDetails(); setPoolFilter("all");
+    }
+    loadedTournament = next.scenario.tournamentId;
+    setState(next); setUrlError(browser.urlError());
     setManualUrl(""); setCopyStatus("");
     if (copyTimer) clearTimeout(copyTimer);
   });
@@ -36,12 +46,13 @@ function App() {
   const tournament = () => state().derived.tournament;
   const fixtures = () => state().derived.fixtures;
   const fixtureById = createMemo(() => new Map(fixtures().map((fixture) => [fixture.id, fixture])));
-  const poolIds = createMemo(() => tournament().pools.map((pool) => pool.id));
-  const poolFixtures = (pool: string) => fixtures().filter((fixture) => fixture.pool === pool);
-  const complete = (fixture: ResolvedFixture) => Boolean(fixture.result && !fixture.issues.length);
-  const poolCount = () => fixtures().filter((fixture) => fixture.stage === "pool" && complete(fixture)).length;
-  const poolTotal = () => fixtures().filter((fixture) => fixture.stage === "pool").length;
-  const knockoutCount = () => fixtures().filter((fixture) => fixture.stage !== "pool" && complete(fixture)).length;
+  const poolFixtures = createMemo(() => fixtures().filter((fixture) => fixture.stage === "pool"));
+  const poolCount = () => poolFixtures().filter((fixture) => fixture.result && !fixture.issues.length).length;
+  const knockoutTotal = () => fixtures().length - poolFixtures().length;
+  const knockoutCount = () => fixtures().filter((fixture) => fixture.stage !== "pool" && fixture.result && !fixture.issues.length).length;
+  const knockoutLocked = () => !state().derived.poolsComplete;
+  const activePhase = () => phase() === "knockout" && !knockoutLocked() ? "knockout" : "pools";
+  const knockoutHint = () => "Complete " + (poolFixtures().length - poolCount()) + " remaining pool " + (poolFixtures().length - poolCount() === 1 ? "match" : "matches") + " to unlock the knockout. Resolve any conflicting details first.";
   const copyLink = async () => {
     const url = window.location.href;
     let copied: boolean;
@@ -61,35 +72,81 @@ function App() {
     copyTimer = setTimeout(() => setCopyStatus(""), 3500);
   };
   return <div class="app-shell">
-    <header class="app-header"><div class="brand">
-      <svg class="brand-ball" viewBox="0 0 36 44" fill="none" aria-hidden="true"><ellipse cx="18" cy="22" rx="12" ry="20" transform="rotate(24 18 22)" stroke="currentColor" stroke-width="2" /><path d="m15 14 7 15M13 17l6-3M15 21l6-3M17 25l6-3" stroke="currentColor" stroke-width="2" /></svg>
-      <span>Rugby World Cup<span class="brand-subtitle">Your tournament. Your call.</span></span><span class="brand-year">{tournament().id === "rwc2027" ? "2027" : "2023"}</span>
-    </div><div class="toolbar" role="group" aria-label="Prediction actions">
-      <button type="button" disabled={Boolean(urlError()) || !state().canUndo} onClick={() => controller.undo()} aria-label="Undo last prediction action" title="Undo (Ctrl/⌘ Z)"><svg class="action-icon" width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h8a5 5 0 0 1 0 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg> <span>Undo</span></button>
-      <button type="button" disabled={Boolean(urlError()) || !state().canRedo} onClick={() => controller.redo()} aria-label="Redo prediction action" title="Redo (Ctrl/⌘ Shift Z)"><svg class="action-icon" width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m13 4 4 4-4 4M17 8H9a5 5 0 0 0 0 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg> <span>Redo</span></button>
-      <button type="button" disabled={Boolean(urlError()) || !Object.keys(state().scenario.predictions).length} onClick={() => controller.reset()}>Reset</button>
-      <button type="button" class="primary-button" disabled={Boolean(urlError())} onClick={() => void copyLink()}>Copy link <span aria-hidden="true">↗</span></button>
-    </div></header>
-    <div class="share-status" role="status">{copyStatus()}</div>
-    <Show when={manualUrl()}><label class="manual-share">Your shareable link<input type="text" readonly value={manualUrl()} onFocus={(event) => event.currentTarget.select()} /></label></Show>
-    <Show when={urlError()}><aside class="recovery-banner" role="alert"><div><strong>This prediction link could not be opened.</strong><p>{urlError()}</p></div><button type="button" onClick={() => browser.recover()}>Start fresh</button></aside></Show>
-    <Show when={state().notice}><p class="scenario-notice" role="status">{state().notice}</p></Show>
-    <main>
-      <section class="intro"><div><p class="eyebrow">{tournament().id === "rwc2023" ? "Legacy 2023 tournament" : "Australia · 1 October – 13 November 2027"}</p><h1>How will your World Cup unfold?</h1><p>Pick the winners. Fine-tune the details if you like.</p><Show when={tournament().rulesStatus === "provisional"}><span class="rules-status">Provisional 2027 qualification rules</span></Show></div><div class="progress-summary"><strong>{poolCount()}<span> / {poolTotal()}</span></strong><span>pool matches picked</span></div></section>
-      <nav class="view-nav" aria-label="Tournament views"><button type="button" aria-pressed={view() === "pools"} onClick={() => setView("pools")}>Pools <span>{tournament().pools.length}</span></button><button type="button" aria-pressed={view() === "knockout"} onClick={() => setView("knockout")}>Knockout <span>{knockoutCount()} / {fixtures().length - poolTotal()}</span></button></nav>
+    <header class="app-header">
+      <div class="toolbar-main">
+        <div class="wordmark" aria-label={"Rugby World Cup " + (tournament().id === "rwc2027" ? "2027" : "2023") + " predictor"}>
+          <span>RWC<span class="wordmark-slash"> / </span>predictor</span><span class="wordmark-year">{tournament().id === "rwc2027" ? "2027" : "2023"}</span>
+        </div>
+        <nav class="view-nav" aria-label="Tournament stages">
+          <button type="button" aria-pressed={activePhase() === "pools"} onClick={() => setPhase("pools")}>
+            <span aria-hidden="true" classList={{ "stage-number": true, "is-complete": !knockoutLocked() }}><Show when={!knockoutLocked()} fallback="1"><Icon name="check" size={12} /></Show></span>
+            <span>Pools</span><span class="stage-count">{poolCount()}/{poolFixtures().length}</span>
+          </button>
+          <Icon name="chevron-right" class="stage-chevron" />
+          <div class="stage-knockout">
+            <button type="button" aria-pressed={activePhase() === "knockout"} aria-disabled={knockoutLocked()}
+              aria-describedby={knockoutLocked() ? "knockout-lock-hint" : undefined}
+              onClick={() => { if (!knockoutLocked()) setPhase("knockout"); }}>
+              <Show when={knockoutLocked()} fallback={<span aria-hidden="true" classList={{ "stage-number": true, "is-complete": knockoutCount() === knockoutTotal() }}><Show when={knockoutCount() === knockoutTotal()} fallback="2"><Icon name="check" size={12} /></Show></span>}><Icon name="lock" /></Show>
+              <span>Knockout</span><Show when={!knockoutLocked()}><span class="stage-count">{knockoutCount()}/{knockoutTotal()}</span></Show>
+            </button>
+            <Show when={knockoutLocked()}><span id="knockout-lock-hint" class="stage-tooltip" role="tooltip">{knockoutHint()}</span></Show>
+          </div>
+        </nav>
+        <div class="toolbar-actions" role="group" aria-label="Prediction actions">
+          <div class="history-actions">
+            <button type="button" class="icon-button" disabled={Boolean(urlError()) || !state().canUndo} onClick={() => controller.undo()} aria-label="Undo last prediction action" title="Undo (Ctrl/⌘ Z)"><Icon name="undo" /></button>
+            <button type="button" class="icon-button" disabled={Boolean(urlError()) || !state().canRedo} onClick={() => controller.redo()} aria-label="Redo prediction action" title="Redo (Ctrl/⌘ Shift Z)"><Icon name="redo" /></button>
+            <button type="button" class="icon-button" disabled={Boolean(urlError()) || !Object.keys(state().scenario.predictions).length} onClick={() => controller.reset()} aria-label="Reset all picks" title="Reset all picks"><Icon name="reset" /></button>
+          </div>
+          <button type="button" class="copy-button" disabled={Boolean(urlError())} onClick={() => void copyLink()} aria-label="Copy link"><Icon name="link" /><span>Copy link</span></button>
+        </div>
+      </div>
+      <div class="toolbar-views"><div class="toolbar-views-inner">
+        <div class="segmented view-options" role="group" aria-label="View">
+          <Show when={activePhase() === "pools"} fallback={<>
+            <button type="button" aria-pressed={knockoutView() === "rounds"} onClick={() => setKnockoutView("rounds")}><Icon name="grid" />Rounds</button>
+            <button type="button" aria-pressed={knockoutView() === "timeline"} onClick={() => setKnockoutView("timeline")}><Icon name="calendar" />Timeline</button>
+            <button type="button" aria-pressed={knockoutView() === "bracket"} onClick={() => setKnockoutView("bracket")}><Icon name="bracket" />Bracket</button>
+          </>}>
+            <button type="button" aria-pressed={poolView() === "pool"} onClick={() => setPoolView("pool")}><Icon name="grid" />By pool</button>
+            <button type="button" aria-pressed={poolView() === "timeline"} onClick={() => setPoolView("timeline")}><Icon name="calendar" />Timeline</button>
+          </Show>
+        </div>
+        <Show when={activePhase() === "pools"}><div class="pool-filter"><span class="control-caption">Pool</span><div class="segmented" role="group" aria-label="Pool filter">
+          <For each={["all", ...tournament().pools.map((pool) => pool.id)]}>{(pool) => <button type="button" aria-pressed={poolFilter() === pool} onClick={() => setPoolFilter(pool)}>{pool === "all" ? "All" : pool}</button>}</For>
+        </div></div></Show>
+      </div></div>
+    </header>
+    <main class="app-main">
+      <h1 class="sr-only">{tournament().name} predictor</h1>
+      <Show when={tournament().id === "rwc2023"}><p class="eyebrow legacy-notice">Legacy 2023 tournament</p></Show>
+      <Show when={manualUrl()}><label class="manual-share">Your shareable link<input type="text" readonly value={manualUrl()} onFocus={(event) => event.currentTarget.select()} /></label></Show>
+      <Show when={urlError()}><aside class="recovery-banner" role="alert"><div><strong>This prediction link could not be opened.</strong><p>{urlError()}</p></div><button type="button" onClick={() => browser.recover()}>Start fresh</button></aside></Show>
+      <Show when={state().notice}><p class="scenario-notice" role="status">{state().notice}</p></Show>
       <fieldset class="prediction-workspace" disabled={Boolean(urlError())}>
         <legend class="sr-only">Tournament predictions</legend>
-        <Show when={view() === "pools"} fallback={<section class="knockout-view"><div class="view-intro"><h2>The road to the final</h2><p>Qualifying teams appear as you complete the pools. Pick who advances at each stage.</p></div><For each={stages.filter((stage) => fixtures().some((fixture) => fixture.stage === stage))}>{(stage) => <section class={`knockout-stage stage-${stage}`}><h3>{stageNames[stage]}</h3><div class="fixture-grid"><For each={fixtures().filter((fixture) => fixture.stage === stage).map((fixture) => fixture.id)}>{(id) => <FixtureCard fixture={fixtureById().get(id)!} controller={controller} />}</For></div></section>}</For></section>}>
-          <nav class="pool-jumps" aria-label="Jump to a pool"><For each={poolIds()}>{(id) => <button type="button" onClick={() => document.getElementById(`pool-${id}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })}>Pool {id}</button>}</For><span>Kickoff times are local to you.</span></nav>
-          <For each={poolIds()}>{(pool) => <section class="pool-section" data-pool-id={pool} id={`pool-${pool}`}>
-            <div class="pool-heading"><h2>Pool {pool}</h2><span>{poolFixtures(pool).filter(complete).length} / {poolFixtures(pool).length} picked</span></div>
-            <div class="pool-content"><aside class="pool-table"><StandingsTable pool={pool} standings={state().derived.standings[pool] ?? []} teams={tournament().teams} complete={state().derived.poolsComplete} thirdQualified={state().derived.qualifiedThirdPools.includes(pool)} /><p class="qualification-note">{tournament().id === "rwc2027" ? "Top two advance. The four best third-place teams join them." : "The top two teams advance."}</p></aside>
-              <div class="fixture-grid"><For each={poolFixtures(pool).map((fixture) => fixture.id)}>{(id) => <FixtureCard fixture={fixtureById().get(id)!} controller={controller} />}</For></div></div>
-          </section>}</For>
+        <Show when={activePhase() === "pools"} fallback={<section class="knockout-view" aria-label="Knockout predictions">
+          <Show when={knockoutView() === "rounds"}><KnockoutRounds derived={state().derived} controller={controller} onDetails={openDetails} /></Show>
+          <Show when={knockoutView() === "timeline"}><Timeline phase="knockout" derived={state().derived} controller={controller} onDetails={openDetails} /></Show>
+          <Show when={knockoutView() === "bracket"}><KnockoutBracket derived={state().derived} controller={controller} onDetails={openDetails} /></Show>
+        </section>}>
+          <Show when={poolView() === "pool"} fallback={<Timeline phase="pools" filter={poolFilter()} derived={state().derived} controller={controller} onDetails={openDetails} />}>
+            <PoolsByPool filter={poolFilter()} derived={state().derived} controller={controller} onDetails={openDetails} />
+          </Show>
         </Show>
       </fieldset>
+      <footer class="app-footer">
+        <p>Kickoff times are local to you. Everything happens in your browser. Share your predictions with the link.</p>
+        <details class="rules-details"><summary>{tournament().rulesStatus === "provisional" ? "Provisional 2027 rules & suggested outcomes" : "Tournament rules & sources"}</summary>
+          <p>{tournament().rulesNote}</p><p>Unspecified scores and tries use reproducible defaults. Open match details to choose a margin, tries, exact scores or bonus points. These are suggestions, rather than live odds or a calibrated forecast.</p>
+          <ul><For each={tournament().sources}>{(source) => <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>}</For></ul><p>{tournament().rankingsLabel}</p>
+        </details>
+        <p>An independent project. Not affiliated with or endorsed by World Rugby or Rugby World Cup Limited.</p>
+      </footer>
     </main>
-    <footer class="app-footer"><p>Everything happens in your browser. Share your predictions with the link.</p><details class="rules-details"><summary>{tournament().rulesStatus === "provisional" ? "Provisional 2027 rules & suggested outcomes" : "Tournament rules & sources"}</summary><p>{tournament().rulesNote}</p><p>Unspecified scores and tries use reproducible defaults. These are suggestions, rather than live odds or a calibrated forecast.</p><ul><For each={tournament().sources}>{(source) => <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label} ↗</a></li>}</For></ul><p>{tournament().rankingsLabel}</p></details></footer>
+    <div classList={{ "share-status": true, "share-status--visible": Boolean(copyStatus()) }} role="status">{copyStatus()}</div>
+    <Show when={activeFixtureId()} keyed>{(id) => <MatchDetailsDialog fixture={fixtureById().get(id)!} controller={controller} onClose={closeDetails} returnFocus={detailTrigger} />}</Show>
   </div>;
 }
 

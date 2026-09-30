@@ -1,0 +1,13 @@
+:root {
+  --duration-control: 150ms; /* @kind other */
+  --duration-panel: 240ms; /* @kind other */
+  --duration-hero: 450ms; /* @kind other */
+  --ease-standard: cubic-bezier(.2, .8, .2, 1); /* @kind other */
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-control: 0ms; /* @kind other */
+    --duration-panel: 0ms; /* @kind other */
+    --duration-hero: 0ms; /* @kind other */
+  }
+}

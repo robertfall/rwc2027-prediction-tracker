@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+</helmet>
+<div style="display:{{ dMob }};flex-direction:column;gap:12px;font-family:var(--font-body);color:var(--color-ink)">
+  <div role="tablist" aria-label="Round" style="display:flex;border:1px solid var(--color-border-strong);border-radius:8px;overflow:hidden">
+    <sc-for list="{{ roundOpts }}" as="o" hint-placeholder-count="4">
+      <button type="button" role="tab" aria-selected="{{ o.sel }}" onClick="{{ o.onClick }}" style="flex:1 1 0;white-space:nowrap;min-height:36px;padding:0 6px;border:0;border-left:1px solid var(--color-border-subtle);font:600 14px/1 var(--font-body);cursor:pointer;background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+    </sc-for>
+  </div>
+  <div style="font-size:13px;color:var(--color-muted)">{{ roundRange }}</div>
+  <sc-if value="{{ showChamp }}">
+    <div style="background:var(--color-eucalyptus);color:var(--color-white);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-sun)">
+        <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="trophy" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+        <span>Your champion</span>
+      </span>
+      <span style="font:700 24px/1 var(--font-display);text-transform:uppercase">{{ champion }}</span>
+    </div>
+  </sc-if>
+  <sc-for list="{{ roundMatches }}" as="r" hint-placeholder-count="4">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <sc-if value="{{ r.label }}"><span style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted);margin-top:4px">{{ r.label }}</span></sc-if>
+      <dc-import name="BracketMatch" match="{{ r.m }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,122px"></dc-import>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-muted);padding-left:4px">
+        <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="corner-down-right" size="{{ 14 }}" hint-size="14px,14px"></x-import>
+        <span>{{ r.m.note }}</span>
+      </span>
+    </div>
+  </sc-for>
+</div>
+<div style="display:{{ dDesk }};overflow-x:auto;padding-bottom:12px;font-family:var(--font-body);color:var(--color-ink)">
+  <div style="min-width:1040px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:40px">
+    <sc-for list="{{ headers }}" as="hd" hint-placeholder-count="4">
+      <div style="padding-bottom:8px;border-bottom:1px solid var(--color-border-strong);margin-bottom:4px">
+        <div style="font:700 20px/1 var(--font-display);text-transform:uppercase">{{ hd.label }}</div>
+        <div style="font-size:13px;color:var(--color-muted);margin-top:2px">{{ hd.range }}</div>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ r16 }}" as="g" hint-placeholder-count="4">
+        <div style="flex:1;position:relative;display:flex;flex-direction:column;justify-content:space-around">
+          <sc-for list="{{ g.items }}" as="m" hint-placeholder-count="2">
+            <div style="margin:8px 0"><dc-import name="BracketMatch" match="{{ m }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,122px"></dc-import></div>
+          </sc-for>
+          <div style="position:absolute;right:-20px;top:25%;bottom:25%;width:20px;border:1px solid var(--color-border-strong);border-left:0;pointer-events:none"></div>
+          <div style="position:absolute;left:calc(100% + 20px);top:50%;width:20px;border-top:1px solid var(--color-border-strong);pointer-events:none"></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ qf }}" as="g" hint-placeholder-count="2">
+        <div style="flex:1;position:relative;display:flex;flex-direction:column;justify-content:space-around">
+          <sc-for list="{{ g.items }}" as="m" hint-placeholder-count="2">
+            <div style="margin:8px 0"><dc-import name="BracketMatch" match="{{ m }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,122px"></dc-import></div>
+          </sc-for>
+          <div style="position:absolute;right:-20px;top:25%;bottom:25%;width:20px;border:1px solid var(--color-border-strong);border-left:0;pointer-events:none"></div>
+          <div style="position:absolute;left:calc(100% + 20px);top:50%;width:20px;border-top:1px solid var(--color-border-strong);pointer-events:none"></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ sf }}" as="g" hint-placeholder-count="1">
+        <div style="flex:1;position:relative;display:flex;flex-direction:column;justify-content:space-around">
+          <sc-for list="{{ g.items }}" as="m" hint-placeholder-count="2">
+            <div style="margin:8px 0"><dc-import name="BracketMatch" match="{{ m }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,122px"></dc-import></div>
+          </sc-for>
+          <div style="position:absolute;right:-20px;top:25%;bottom:25%;width:20px;border:1px solid var(--color-border-strong);border-left:0;pointer-events:none"></div>
+          <div style="position:absolute;left:calc(100% + 20px);top:50%;width:20px;border-top:1px solid var(--color-border-strong);pointer-events:none"></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="position:relative;display:flex;flex-direction:column;justify-content:center">
+      <div style="position:relative;margin:8px 0">
+        <dc-import name="BracketMatch" match="{{ final }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,122px"></dc-import>
+        <sc-if value="{{ champion }}">
+          <div style="position:absolute;top:calc(100% + 16px);left:0;right:0;background:var(--color-eucalyptus);color:var(--color-white);border-radius:12px;padding:16px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-sun)">
+              <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="trophy" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+              <span>Your champion</span>
+            </div>
+            <div style="font:700 36px/1 var(--font-display);text-transform:uppercase;margin-top:8px">{{ champion }}</div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:8px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted);margin-bottom:8px">Bronze final</div>
+        <dc-import name="BracketMatch" match="{{ bronze }}" on-pick="{{ onPick }}" on-details="{{ onDetails }}" pick-style="{{ pickStyle }}" hint-size="100%,122px"></dc-import>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;headers&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;r16&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;qf&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;sf&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;final&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;bronze&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;champion&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;onPick&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;onDetails&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;pickStyle&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;}}">class Component extends DCLogic {
+  state = { round: 'R16' };
+  renderVals() {
+    const n = !!this.props.narrow, p = this.props, r = this.state.round;
+    const flat = (gs) => (gs || []).reduce((a, g) => a.concat(g.items || []), []).sort((x, y) => x.no - y.no).map(m => ({ m, label: '' }));
+    const list = r === 'R16' ? flat(p.r16) : r === 'QF' ? flat(p.qf) : r === 'SF' ? flat(p.sf)
+      : [{ m: p.final || { home: {}, away: {} }, label: 'Final' }, { m: p.bronze || { home: {}, away: {} }, label: 'Bronze final' }];
+    const hd = p.headers || [], idx = { R16: 0, QF: 1, SF: 2, F: 3 }[r];
+    const opts = [['R16', 'R16'], ['QF', 'QF'], ['SF', 'SF'], ['F', 'Final']].map(([v, label]) => ({ label, sel: r === v, bg: r === v ? 'var(--color-ink)' : 'var(--color-white)', fg: r === v ? 'var(--color-white)' : 'var(--color-ink)', onClick: () => this.setState({ round: v }) }));
+    return {
+      dMob: n ? 'flex' : 'none', dDesk: n ? 'none' : 'block',
+      roundOpts: opts, roundMatches: list, roundRange: ((hd[idx] || {}).label || '') + ' · ' + ((hd[idx] || {}).range || ''),
+      showChamp: r === 'F' && !!p.champion,
+    };
+  }
+}
+</script>
+</body>
+</html>

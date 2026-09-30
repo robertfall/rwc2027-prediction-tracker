@@ -33,19 +33,22 @@ try {
       for (const card of document.querySelectorAll(".pool-section .fixture-card")) {
         await measure(() => card.querySelector(".winner-choice").click());
       }
-      document.querySelectorAll(".view-nav button")[1].click();
+      document.querySelector('.view-nav button[aria-pressed="false"]').click();
       for (const card of document.querySelectorAll(".knockout-view .fixture-card")) {
         await measure(() => card.querySelector(".winner-choice").click());
       }
       const final = document.querySelector('[data-fixture-id="52"]');
       final.querySelector(".details-toggle").click();
-      const input = final.querySelector('input[name="homeScore"]');
+      const dialog = document.querySelector(".match-dialog");
+      dialog.querySelector(".detail-advanced summary").click();
+      const input = dialog.querySelector('input[name="homeScore"]');
       for (let n = 0; n < 30; n++) {
         await measure(() => {
           input.value = String(24 + n % 7);
           input.dispatchEvent(new Event("input", { bubbles: true }));
         });
       }
+      dialog.querySelector(".detail-done").click();
       const summarize = (values) => {
         const sorted = values.toSorted((a, b) => a - b);
         return {
@@ -69,8 +72,8 @@ try {
       externalEditRequests: editRequests.filter((request) => new URL(request.url).origin !== new URL(baseUrl).origin).length,
       fetchOrXhrEditRequests: editRequests.filter((request) => ["fetch", "xhr"].includes(request.type)).length,
     });
-    await page.getByRole("button", { name: "Reset", exact: true }).click();
-    await page.getByRole("button", { name: /^Pools/ }).click();
+    await page.getByRole("button", { name: "Reset all picks", exact: true }).click();
+    await page.getByRole("button", { name: /\bPools\b/ }).click();
   }
   console.log(JSON.stringify({ browser: browser.version(), viewport: "1440x1100", measured, errors }, null, 2));
 } finally {

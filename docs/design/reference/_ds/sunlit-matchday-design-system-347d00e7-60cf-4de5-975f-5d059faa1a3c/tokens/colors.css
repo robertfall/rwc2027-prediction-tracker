@@ -1,0 +1,41 @@
+/* Sunlit Matchday v0.1 — original proposal, NOT official RWC colours. */
+:root {
+  color-scheme: light;
+  /* Base palette */
+  --color-paper: #F7F3E8;
+  --color-white: #FFFFFF;
+  --color-sand: #E7DDCC;
+  --color-ink: #202A27;
+  --color-muted: #5C665F;
+  --color-eucalyptus: #245C4A;
+  --color-eucalyptus-hover: #1B493A;
+  --color-clay: #B84E32;
+  --color-clay-hover: #9C4028;
+  --color-sun: #E9B949;
+  --color-border-subtle: #D6D0C3;
+  --color-border-strong: #7D857D;
+  --color-focus: #255D7A;
+  /* Semantic states — always pair with a label or icon */
+  --color-success: #236242;
+  --color-warning: #805A00;
+  --color-error: #A63238;
+  --color-info: #255D7A;
+  /* Semantic aliases */
+  --color-bg: var(--color-paper);
+  --color-surface: var(--color-white);
+  --color-text: var(--color-ink);
+  --color-text-muted: var(--color-muted);
+  --color-action: var(--color-clay);
+  --color-action-hover: var(--color-clay-hover);
+  --color-on-action: var(--color-white);
+  --surface-page: var(--color-paper);
+  --surface-card: var(--color-white);
+  --surface-quiet: var(--color-sand);
+  --surface-brand: var(--color-eucalyptus);
+  --text-body: var(--color-ink);
+  --text-secondary: var(--color-muted);
+  --text-on-brand: var(--color-white);
+  --text-accent: var(--color-clay);
+  --border-decorative: var(--color-border-subtle);
+  --border-control: var(--color-border-strong);
+}

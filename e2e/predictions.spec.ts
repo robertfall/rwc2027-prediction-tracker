@@ -1,8 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const card = (page: Page, id: number) => page.locator(`[data-fixture-id="${id}"]`);
+const card = (page: Page, id: number) => page.locator('[data-fixture-id="' + id + '"]');
 const undo = (page: Page) => page.getByRole("button", { name: "Undo last prediction action" });
 const redo = (page: Page) => page.getByRole("button", { name: "Redo prediction action" });
+const dialog = (page: Page) => page.getByRole("dialog");
+
+async function details(page: Page, id: number): Promise<void> {
+  await card(page, id).locator(".details-toggle").click();
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page).getByText("Exact scores & bonus points", { exact: true }).click();
+}
+
+async function done(page: Page): Promise<void> {
+  await dialog(page).getByRole("button", { name: "Done", exact: true }).click();
+  await expect(dialog(page)).not.toBeVisible();
+}
 
 test("winner-first edits, grouped undo and links replay in a fresh browser", async ({ page, browser }) => {
   await page.goto("/");
@@ -12,61 +24,75 @@ test("winner-first edits, grouped undo and links replay in a fresh browser", asy
   const initialHistory = await page.evaluate(() => history.length);
   const first = card(page, 1);
   await first.getByRole("button", { name: "Australia", exact: true }).click();
-  await expect(first.locator(".result-preview strong")).toHaveText("24 – 17");
-  const australia = page.getByRole("table", { name: "Pool A standings", exact: true }).getByRole("row").filter({ hasText: "AUS" });
+  await expect(first.locator(".result-preview strong")).toHaveText(/by\s+7/i);
+  const australia = page.getByRole("table", { name: "Pool A standings", exact: true }).getByRole("row").filter({ hasText: "Australia" });
   await expect(australia.locator(".standing-points")).toHaveText("4");
-  await first.getByRole("button", { name: "Details", exact: false }).click();
-  const margin = first.locator("#match-1-margin");
+  await details(page, 1);
+  const quickMargin = dialog(page).getByRole("group", { name: "Winning margin, match 1", exact: true });
+  await expect(quickMargin.locator(".detail-label small")).toHaveText("Suggested 7");
+  await expect(quickMargin.getByRole("button", { name: "by 7", exact: true })).toHaveAttribute("aria-pressed", "false");
+  const margin = dialog(page).locator("#match-1-margin");
   await expect(margin).toHaveValue("");
   await expect(margin).toHaveAttribute("placeholder", "7");
   await margin.fill("1");
   await margin.fill("15");
-  await margin.blur();
-  await expect(margin).toHaveValue("15");
-  await undo(page).click();
-  await expect(margin).toHaveValue("");
-  await expect(first.locator(".result-preview strong")).toHaveText("24 – 17");
-  await redo(page).click();
-  await expect(margin).toHaveValue("15");
-  await first.locator("#match-1-homeTries").fill("4");
-  await first.locator("#match-1-homeTries").blur();
+  await expect(quickMargin.locator(".detail-label small")).toHaveText("Your choice 15");
+  await dialog(page).locator("#match-1-homeTries").fill("4");
+  await expect(dialog(page).getByRole("group", { name: "Australia tries, match 1", exact: true }).locator("small")).toHaveText("Your choice 4");
   await expect(australia.locator(".standing-points")).toHaveText("5");
+  await done(page);
+  await undo(page).click();
+  await expect(first.locator(".result-preview strong")).toHaveText(/by\s+7/i);
+  await expect(australia.locator(".standing-points")).toHaveText("4");
+  await details(page, 1);
+  await expect(margin).toHaveValue("");
+  await expect(dialog(page).locator("#match-1-homeTries")).toHaveValue("");
+  await done(page);
+  await redo(page).click();
+  await details(page, 1);
+  await expect(margin).toHaveValue("15");
+  await expect(dialog(page).locator("#match-1-homeTries")).toHaveValue("4");
   const savedUrl = page.url();
   expect(savedUrl).toContain("#predictions=v2.rwc2027.fixtures-2026-02.");
   expect(await page.evaluate(() => history.length)).toBe(initialHistory);
-  await first.locator("#match-1-homeScore").fill("256");
-  await expect(first.locator("#match-1-homeScore")).toHaveAttribute("aria-invalid", "true");
+  await dialog(page).locator("#match-1-homeScore").fill("256");
+  await expect(dialog(page).locator("#match-1-homeScore")).toHaveAttribute("aria-invalid", "true");
   expect(page.url()).toBe(savedUrl);
-  await first.locator("#match-1-homeScore").fill("");
+  await dialog(page).locator("#match-1-homeScore").fill("");
+  await done(page);
   const fresh = await browser.newContext();
   const shared = await fresh.newPage();
   await shared.goto(savedUrl);
   const sharedFirst = card(shared, 1);
   await expect(sharedFirst.getByRole("button", { name: "Australia", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await sharedFirst.getByRole("button", { name: "Details", exact: false }).click();
-  await expect(sharedFirst.locator("#match-1-margin")).toHaveValue("15");
-  await expect(sharedFirst.locator("#match-1-homeTries")).toHaveValue("4");
-  await expect(sharedFirst.locator(".result-preview strong")).toHaveText(await first.locator(".result-preview strong").innerText());
+  await expect(sharedFirst.locator(".result-preview strong")).toHaveText((await first.locator(".result-preview strong").textContent()) ?? "");
+  await details(shared, 1);
+  await expect(dialog(shared).locator("#match-1-margin")).toHaveValue("15");
+  await expect(dialog(shared).locator("#match-1-homeTries")).toHaveValue("4");
+  await done(shared);
   await expect(undo(shared)).toBeDisabled();
   await fresh.close();
-  await page.getByRole("button", { name: "Reset", exact: true }).click();
+  await page.getByRole("button", { name: /^Reset/ }).click();
   await expect(first.locator(".result-preview strong")).toHaveCount(0);
   await undo(page).click();
-  await expect(first.locator("#match-1-margin")).toHaveValue("15");
+  await details(page, 1);
+  await expect(margin).toHaveValue("15");
 });
 
 test("bonus choices and contradictory detail remain visible, shareable and undoable", async ({ page, browser }) => {
   await page.goto("/");
   const first = card(page, 1);
   await first.getByRole("button", { name: "Australia", exact: true }).click();
-  await first.getByRole("button", { name: "Details", exact: false }).click();
-  const tryBonus = first.getByRole("group", { name: "Australia Try bonus, match 1", exact: true });
+  await details(page, 1);
+  const tryBonus = dialog(page).getByRole("group", { name: "Australia Try bonus, match 1", exact: true });
   await tryBonus.getByRole("button", { name: "Yes", exact: true }).click();
   await expect(first.locator(".result-preview")).toContainText("4 –");
-  await first.locator("#match-1-awayScore").fill("255");
-  await first.locator("#match-1-awayScore").blur();
+  await done(page);
+  await details(page, 1);
+  await dialog(page).locator("#match-1-awayScore").fill("255");
+  await done(page);
   await expect(first.locator(".fixture-issues")).toBeVisible();
-  const australia = page.getByRole("table", { name: "Pool A standings", exact: true }).getByRole("row").filter({ hasText: "AUS" });
+  const australia = page.getByRole("table", { name: "Pool A standings", exact: true }).getByRole("row").filter({ hasText: "Australia" });
   await expect(australia.locator(".standing-points")).toHaveText("0");
   const shared = await browser.newPage();
   await shared.goto(page.url());
@@ -76,7 +102,9 @@ test("bonus choices and contradictory detail remain visible, shareable and undoa
   await undo(page).click();
   await expect(first.locator(".fixture-issues")).toHaveCount(0);
   await expect(australia.locator(".standing-points")).toHaveText("5");
+  await details(page, 1);
   await tryBonus.getByRole("button", { name: "Auto", exact: true }).click();
+  await done(page);
   await expect(redo(page)).toBeDisabled();
 });
 
@@ -85,22 +113,31 @@ test("all 52 matches resolve, including bronze, and upstream changes undo atomic
   await page.goto("/");
   const poolIds = await page.locator(".fixture-card").evaluateAll((cards) => cards.map((entry) => Number(entry.getAttribute("data-fixture-id"))));
   for (const id of poolIds) await card(page, id).locator(".winner-choice").first().click();
-  await page.getByRole("button", { name: /^Knockout/ }).click();
+  await page.getByRole("button", { name: /\bKnockout\b/ }).click();
   await expect(page.locator(".fixture-card")).toHaveCount(16);
   for (let id = 37; id <= 52; id++) {
     await expect(card(page, id).locator(".winner-choice").first()).toBeEnabled();
     await card(page, id).locator(".winner-choice").first().click();
   }
+  await details(page, 37);
+  await dialog(page).getByRole("group", { name: "Regulation result, match 37", exact: true }).getByRole("button", { name: "Draw", exact: true }).click();
+  await expect(dialog(page).locator(".fixture-issues")).toHaveCount(0);
+  const drawnScore = await dialog(page).locator(".match-dialog-preview strong").innerText();
+  const [homePoints, awayPoints] = drawnScore.split(" – ");
+  expect(homePoints).toBe(awayPoints);
+  await done(page);
+  await expect(card(page, 37).locator(".winner-choice").first()).toHaveAttribute("aria-pressed", "true");
+  await expect(card(page, 37).locator(".result-preview strong")).toHaveText("Draw");
   await expect(card(page, 51).locator(".result-preview strong")).toBeVisible();
   await expect(card(page, 52).locator(".result-preview strong")).toBeVisible();
   const finalTeams = await card(page, 52).locator(".winner-choice").allTextContents();
-  const finalScore = await card(page, 52).locator(".result-preview strong").innerText();
+  const finalSummary = (await card(page, 52).locator(".result-preview").textContent()) ?? "";
   const fullUrl = page.url();
   expect(fullUrl.length).toBeLessThan(2000);
   const shared = await browser.newPage();
   await shared.goto(fullUrl);
-  await shared.getByRole("button", { name: /^Knockout/ }).click();
-  await expect(card(shared, 52).locator(".result-preview strong")).toHaveText(finalScore);
+  await shared.getByRole("button", { name: /\bKnockout\b/ }).click();
+  await expect(card(shared, 52).locator(".result-preview")).toHaveText(finalSummary);
   expect(await card(shared, 52).locator(".winner-choice").allTextContents()).toEqual(finalTeams);
   await shared.close();
   await card(page, 38).locator(".winner-choice").last().click();
@@ -108,7 +145,7 @@ test("all 52 matches resolve, including bronze, and upstream changes undo atomic
   await expect(page.locator(".scenario-notice")).toContainText("cleared");
   await undo(page).click();
   expect(page.url()).toBe(fullUrl);
-  await expect(card(page, 52).locator(".result-preview strong")).toHaveText(finalScore);
+  await expect(card(page, 52).locator(".result-preview")).toHaveText(finalSummary);
 });
 
 test("malformed links stay intact until recovery; both legacy formats stay in 2023", async ({ page }) => {
@@ -122,17 +159,20 @@ test("malformed links stay intact until recovery; both legacy formats stay in 20
   expect(new URL(page.url()).hash).toBe("");
   const legacySlash = Buffer.from([48, 1, 0, 0, 0, 0, 0, 255, 255, 255]).toString("base64");
   expect(legacySlash).toContain("/");
-  await page.goto(`/${legacySlash}`);
+  await page.goto("/" + legacySlash);
   await expect(page.locator(".eyebrow")).toHaveText("Legacy 2023 tournament");
   await expect(page.locator(".fixture-card")).toHaveCount(40);
-  await expect(card(page, 1).locator(".result-preview strong")).toHaveText("255 – 255");
+  await details(page, 1);
+  await expect(dialog(page).locator("#match-1-homeScore")).toHaveValue("255");
+  await expect(dialog(page).locator("#match-1-awayScore")).toHaveValue("255");
+  await done(page);
   const v1 = Buffer.from([1, 1, 31, 9, 10, 1, 2]).toString("base64url");
-  await page.goto(`/#predictions=v1.rwc2023.fixtures-v1.${v1}`);
+  await page.goto("/#predictions=v1.rwc2023.fixtures-v1." + v1);
   await expect(page.locator(".eyebrow")).toHaveText("Legacy 2023 tournament");
-  await expect(card(page, 1).locator(".result-preview strong")).toHaveText("9 – 10");
-  await card(page, 1).getByRole("button", { name: "Details", exact: false }).click();
-  await expect(card(page, 1).locator("#match-1-homeScore")).toHaveValue("9");
-  await expect(card(page, 1).locator("#match-1-awayTries")).toHaveValue("2");
+  await details(page, 1);
+  await expect(dialog(page).locator("#match-1-homeScore")).toHaveValue("9");
+  await expect(dialog(page).locator("#match-1-awayScore")).toHaveValue("10");
+  await expect(dialog(page).locator("#match-1-awayTries")).toHaveValue("2");
 });
 
 test("Back and Forward import scenarios without feeding the local undo session", async ({ page }) => {
@@ -159,19 +199,22 @@ test("mobile details keep focus and layout; copy-link and keyboard undo work", a
   await page.goto("/");
   const first = card(page, 1);
   await first.getByRole("button", { name: "Australia", exact: true }).click();
-  await first.getByRole("button", { name: "Details", exact: false }).click();
-  const score = first.locator("#match-1-homeScore");
+  await details(page, 1);
+  const score = dialog(page).locator("#match-1-homeScore");
   await score.fill("30");
   await expect(score).toBeFocused();
   await expect(score).toHaveValue("30");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  await score.blur();
+  await done(page);
   await page.getByRole("button", { name: /^Copy link/ }).click();
-  await expect(page.getByRole("status")).toContainText("Link copied");
+  await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
   await page.keyboard.press("Control+z");
+  await details(page, 1);
   await expect(score).toHaveValue("");
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Control+Shift+z");
+  await details(page, 1);
   await expect(score).toHaveValue("30");
 });

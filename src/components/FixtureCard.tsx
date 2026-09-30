@@ -1,135 +1,96 @@
-import { For, Show, createSignal } from "solid-js";
-import type { PredictionIntent, ResolvedFixture, Side } from "../domain/types";
+import { For, Show } from "solid-js";
+import type { PredictionIntent, ResolvedFixture, Side, Winner } from "../domain/types";
+import { intentFields } from "../domain/completion";
 import type { ScenarioController } from "../state/controller";
 import { TeamLabel, sourceLabel } from "./TeamLabel";
+import { Icon } from "./Icon";
 
-const intentKeys = ["winner", "advancing", "margin", "homeScore", "awayScore", "homeTries", "awayTries", "homeTryBonus", "awayTryBonus", "homeLosingBonus", "awayLosingBonus"] as const;
-const dateFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-type NumericKey = "margin" | "homeScore" | "awayScore" | "homeTries" | "awayTries";
+const dateFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const stageNames = { pool: "Pool", round16: "R16", quarter: "QF", semi: "SF", bronze: "Bronze", final: "Final" } as const;
 
-function NumberField(props: {
-  fixtureId: number; field: NumericKey; label: string; context: string;
-  explicit?: number; suggested?: number; max: number; controller: ScenarioController;
-}) {
-  const [error, setError] = createSignal<string>();
-  const id = () => `match-${props.fixtureId}-${props.field}`;
-  return <div class="number-field">
-    <label for={id()}>{props.label}</label>
-    <div class="number-input-wrap">
-      <input id={id()} name={props.field} type="number" inputMode="numeric" min="0" max={props.max} step="1"
-        value={props.explicit ?? ""} placeholder={props.suggested === undefined ? "—" : String(props.suggested)}
-        classList={{ "is-explicit": props.explicit !== undefined }}
-        aria-label={`${props.context} ${props.label.toLowerCase()}, match ${props.fixtureId}`}
-        aria-invalid={error() ? "true" : undefined} aria-describedby={`${id()}-hint`}
-        onInput={(event) => {
-          const input = event.currentTarget;
-          const value = input.valueAsNumber;
-          if (input.validity.badInput || (input.value !== "" && (!Number.isInteger(value) || value < 0 || value > props.max))) {
-            setError(`Use a whole number from 0 to ${props.max}.`);
-            return;
-          }
-          setError(undefined);
-          props.controller.update(props.fixtureId, { [props.field]: input.value === "" ? undefined : value }, id());
-        }}
-        onBlur={() => props.controller.finishGroup()} />
-      <Show when={props.explicit !== undefined}><button class="field-clear" type="button" aria-label={`Use suggested ${props.context} ${props.label.toLowerCase()}, match ${props.fixtureId}`}
-        onClick={() => { props.controller.finishGroup(); setError(undefined); props.controller.update(props.fixtureId, { [props.field]: undefined }); }}>×</button></Show>
-    </div>
-    <span classList={{ "field-hint": true, "field-error": Boolean(error()) }} id={`${id()}-hint`}>
-      {error() ?? (props.explicit !== undefined ? "Your choice" : props.suggested !== undefined ? `Suggested ${props.suggested}` : "Optional")}
-    </span>
-  </div>;
+export function fixtureDateTime(fixture: ResolvedFixture): string {
+  const date = new Date(fixture.kickoff);
+  return `${dateFormat.format(date)} · ${timeFormat.format(date)}`;
 }
 
-type BonusKey = "homeTryBonus" | "awayTryBonus" | "homeLosingBonus" | "awayLosingBonus";
-function BonusField(props: { fixtureId: number; field: BonusKey; label: string; context: string; explicit?: boolean; suggested?: boolean; controller: ScenarioController }) {
-  return <div class="bonus-field" role="group" aria-label={`${props.context} ${props.label}, match ${props.fixtureId}`}>
-    <span class="bonus-label">{props.label}<small>{props.explicit !== undefined ? "Your choice" : props.suggested === undefined ? "Not yet suggested" : `Suggested ${props.suggested ? "yes" : "no"}`}</small></span>
-    <div class="bonus-options">
-      <For each={["auto", "yes", "no"] as const}>{(option) => <button type="button"
-        aria-pressed={option === "auto" ? props.explicit === undefined : props.explicit === (option === "yes")}
-        onClick={() => props.controller.update(props.fixtureId, { [props.field]: option === "auto" ? undefined : option === "yes" })}>
-        {option === "auto" ? "Auto" : option === "yes" ? "Yes" : "No"}
-      </button>}</For>
-    </div>
-  </div>;
+export function fixtureTeamName(fixture: ResolvedFixture, side: Side): string {
+  return fixture[side === "home" ? "homeTeam" : "awayTeam"]?.name ?? sourceLabel(fixture[side]);
 }
 
-export function FixtureCard(props: { fixture: ResolvedFixture; controller: ScenarioController }) {
-  const [expanded, setExpanded] = createSignal(false);
-  const intent = () => props.fixture.prediction?.intent ?? {};
+export function fixtureChoice(fixture: ResolvedFixture): Winner | undefined {
+  const intent = fixture.prediction?.intent;
+  return fixture.stage === "pool" ? intent?.winner ?? fixture.result?.winner : intent?.advancing ?? fixture.result?.advancing;
+}
+
+export function clearFixturePrediction(controller: ScenarioController, id: number): void {
+  const patch: Partial<PredictionIntent> = {};
+  for (const field of intentFields) patch[field] = undefined;
+  controller.update(id, patch);
+}
+
+export interface FixtureCardProps {
+  fixture: ResolvedFixture;
+  controller: ScenarioController;
+  variant?: "card" | "row" | "bracket";
+  onDetails: (fixtureId: number, trigger: HTMLButtonElement) => void;
+  note?: string;
+}
+
+export function FixtureCard(props: FixtureCardProps) {
+  const variant = () => props.variant ?? "card";
   const isPool = () => props.fixture.stage === "pool";
-  const selected = () => isPool() ? intent().winner : intent().advancing;
   const ready = () => Boolean(props.fixture.homeTeam && props.fixture.awayTeam);
-  const teamName = (side: Side) => props.fixture[side === "home" ? "homeTeam" : "awayTeam"]?.name ?? sourceLabel(props.fixture[side]);
-  const score = () => props.fixture.result;
-  const tryBonus = (side: Side) => score() ? score()![side === "home" ? "homeTries" : "awayTries"] >= 4 : undefined;
-  const losingBonus = (side: Side) => {
-    const result = score();
-    if (!result) return undefined;
-    const margin = result.homeScore - result.awayScore;
-    return side === "home" ? margin < 0 && margin >= -7 : margin > 0 && margin <= 7;
-  };
-  const choose = (side: "home" | "away" | "draw") => props.controller.update(props.fixture.id, isPool() ? { winner: side } : { advancing: side as Side });
-  const clear = () => {
-    const patch: Partial<PredictionIntent> = {};
-    for (const key of intentKeys) patch[key] = undefined;
-    props.controller.update(props.fixture.id, patch);
-  };
-  return <article data-fixture-id={props.fixture.id} classList={{ "fixture-card": true, "has-prediction": Boolean(props.fixture.result), "has-conflict": props.fixture.issues.length > 0 }} aria-label={`Match ${props.fixture.id}: ${teamName("home")} versus ${teamName("away")}`}>
-    <div class="fixture-meta"><span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{dateFormat.format(new Date(props.fixture.kickoff))}</time></div>
+  const selected = () => fixtureChoice(props.fixture);
+  const result = () => props.fixture.result;
+  const margin = () => result() ? Math.abs(result()!.homeScore - result()!.awayScore) : undefined;
+  function choose(side: Winner): void {
+    props.controller.finishGroup();
+    if (selected() === side) clearFixturePrediction(props.controller, props.fixture.id);
+    else props.controller.update(props.fixture.id, isPool() ? { winner: side } : { advancing: side as Side });
+  }
+  const openDetails = (trigger: HTMLButtonElement) => props.onDetails(props.fixture.id, trigger);
+  const drawButton = () => <button type="button" class="draw-choice" aria-pressed={selected() === "draw"}
+    disabled={!ready()} onClick={() => choose("draw")}><Show when={selected() === "draw"}><Icon name="check" size={14} /></Show>Draw</button>;
+  const teamButton = (side: Side) => <button type="button" class="winner-choice"
+    classList={{ "is-selected": selected() === side, "has-other-pick": selected() !== undefined && selected() !== side }}
+    aria-pressed={selected() === side} disabled={!ready()} title={fixtureTeamName(props.fixture, side)} onClick={() => choose(side)}>
+    <TeamLabel team={props.fixture[side === "home" ? "homeTeam" : "awayTeam"]} fallback={sourceLabel(props.fixture[side])} />
+    <Show when={variant() === "bracket"} fallback={<span class="winner-mark" aria-hidden="true"><Show when={selected() === side}><Icon name="check" size={16} /></Show></span>}>
+      <span class="bracket-score" aria-hidden="true"><Show when={result() && selected() === side}>{result()!.winner === "draw" ? "Adv." : `+${margin()}`}</Show></span>
+    </Show>
+  </button>;
+
+  return <article data-fixture-id={props.fixture.id} classList={{
+    "fixture-card": true, "fixture-card--card": variant() === "card", "fixture-card--row": variant() === "row",
+    "fixture-card--bracket": variant() === "bracket", "has-prediction": Boolean(result()), "has-conflict": props.fixture.issues.length > 0,
+  }} aria-label={`Match ${props.fixture.id}: ${fixtureTeamName(props.fixture, "home")} versus ${fixtureTeamName(props.fixture, "away")}`}>
+    <Show when={variant() === "row"} fallback={<Show when={variant() === "bracket"} fallback={
+      <div class="fixture-meta"><span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{fixtureDateTime(props.fixture)}</time></div>
+    }>
+      <button type="button" class="fixture-meta fixture-bracket-header" disabled={!ready()} aria-label={`Details for match ${props.fixture.id}`}
+        aria-haspopup="dialog" aria-controls={`match-${props.fixture.id}-details-dialog`} onClick={(event) => openDetails(event.currentTarget)}>
+        <span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{fixtureDateTime(props.fixture)}</time>
+      </button>
+    </Show>}>
+      <div class="fixture-row-time"><time dateTime={props.fixture.kickoff}>{timeFormat.format(new Date(props.fixture.kickoff))}</time>
+        <span>{isPool() ? `Pool ${props.fixture.pool}` : stageNames[props.fixture.stage]} · M{props.fixture.id}</span>
+      </div>
+    </Show>
     <fieldset class="fixture-edit" disabled={!ready()}>
       <legend class="sr-only">{isPool() ? "Pick the match result" : "Pick the team to advance"}</legend>
-      <div class="winner-options">
-        <button type="button" class="winner-choice" aria-pressed={selected() === "home"} onClick={() => choose("home")}>
-          <TeamLabel team={props.fixture.homeTeam} fallback={sourceLabel(props.fixture.home)} />
-          <span class="winner-mark" aria-hidden="true">{selected() === "home" ? "✓" : ""}</span>
-        </button>
-        <Show when={isPool()}><button type="button" class="draw-choice" aria-pressed={selected() === "draw"} onClick={() => choose("draw")}>Draw</button></Show>
-        <button type="button" class="winner-choice" aria-pressed={selected() === "away"} onClick={() => choose("away")}>
-          <TeamLabel team={props.fixture.awayTeam} fallback={sourceLabel(props.fixture.away)} />
-          <span class="winner-mark" aria-hidden="true">{selected() === "away" ? "✓" : ""}</span>
-        </button>
-      </div>
+      <div class="winner-options">{teamButton("home")}<Show when={variant() === "row" && isPool()}>{drawButton()}</Show>{teamButton("away")}</div>
+      <Show when={variant() === "card" && isPool()}><div class="fixture-draw">{drawButton()}</div></Show>
     </fieldset>
-    <div class="fixture-footer">
-      <span class="result-preview"><Show when={score()} fallback={<span>{ready() ? (isPool() ? "Pick a winner or draw" : "Pick a team to advance") : "Waiting for qualifying teams"}</span>}>
-        <strong>{score()!.homeScore} – {score()!.awayScore}</strong><span>{score()!.homeTries} – {score()!.awayTries} tries</span>
+    <Show when={variant() !== "bracket"}><div class="fixture-footer">
+      <span class="result-preview"><Show when={result()} fallback={<span>{ready() ? "No pick yet" : "Waiting on earlier picks"}</span>}>
+        <strong>{result()!.winner === "draw" ? "Draw" : `By ${margin()}`}</strong><span>{result()!.homeTries} – {result()!.awayTries} tries</span>
       </Show></span>
-      <button type="button" class="details-toggle" aria-expanded={expanded()} aria-controls={`match-${props.fixture.id}-details`} onClick={() => setExpanded(!expanded())}>Details <span aria-hidden="true">{expanded() ? "−" : "+"}</span></button>
-    </div>
-    <Show when={props.fixture.issues.length}><ul class="fixture-issues" aria-live="polite"><For each={props.fixture.issues}>{(issue) => <li>{issue}</li>}</For></ul></Show>
-    <Show when={expanded()}>
-      <fieldset id={`match-${props.fixture.id}-details`} class="fixture-details" disabled={!ready()}>
-        <legend class="sr-only">Match {props.fixture.id} scoring details</legend>
-        <p class="details-note">Suggested details fill the gaps. Clear a field to use its suggestion.</p>
-        <Show when={!isPool()}><div class="regulation-result" role="group" aria-label={`Regulation result, match ${props.fixture.id}`}>
-          <span>Regulation result</span>
-          <div class="regulation-options"><For each={["home", "draw", "away"] as const}>{(winner) => <button type="button" aria-pressed={intent().winner === winner}
-            onClick={() => props.controller.update(props.fixture.id, { winner })}>{winner === "draw" ? "Draw" : teamName(winner)}</button>}</For>
-            <button type="button" aria-pressed={intent().winner === undefined} onClick={() => props.controller.update(props.fixture.id, { winner: undefined })}>Auto</button>
-          </div>
-          <small>Advancement can be decided after a regulation draw.</small>
-        </div></Show>
-        <div class="margin-row"><NumberField fixtureId={props.fixture.id} field="margin" label="Winning margin" context="Match" explicit={intent().margin}
-          suggested={score() ? Math.abs(score()!.homeScore - score()!.awayScore) : undefined} max={255} controller={props.controller} /></div>
-        <div class="scoring-columns"><For each={["home", "away"] as const}>{(side) => <div class="team-details">
-          <h4><TeamLabel team={props.fixture[side === "home" ? "homeTeam" : "awayTeam"]} fallback={teamName(side)} /></h4>
-          <div class="score-inputs">
-            <NumberField fixtureId={props.fixture.id} field={side === "home" ? "homeScore" : "awayScore"} label="Points" context={teamName(side)}
-              explicit={intent()[side === "home" ? "homeScore" : "awayScore"]} suggested={score()?.[side === "home" ? "homeScore" : "awayScore"]} max={255} controller={props.controller} />
-            <NumberField fixtureId={props.fixture.id} field={side === "home" ? "homeTries" : "awayTries"} label="Tries" context={teamName(side)}
-              explicit={intent()[side === "home" ? "homeTries" : "awayTries"]} suggested={score()?.[side === "home" ? "homeTries" : "awayTries"]} max={15} controller={props.controller} />
-          </div>
-          <Show when={isPool()}>
-            <BonusField fixtureId={props.fixture.id} field={side === "home" ? "homeTryBonus" : "awayTryBonus"} label="Try bonus" context={teamName(side)}
-              explicit={intent()[side === "home" ? "homeTryBonus" : "awayTryBonus"]} suggested={tryBonus(side)} controller={props.controller} />
-            <BonusField fixtureId={props.fixture.id} field={side === "home" ? "homeLosingBonus" : "awayLosingBonus"} label="Losing bonus" context={teamName(side)}
-              explicit={intent()[side === "home" ? "homeLosingBonus" : "awayLosingBonus"]} suggested={losingBonus(side)} controller={props.controller} />
-          </Show>
-        </div>}</For></div>
-        <div class="details-bottom"><span>{props.fixture.venue}</span><button type="button" class="text-button" disabled={!props.fixture.prediction} onClick={clear}>Clear match</button></div>
-      </fieldset>
-    </Show>
+      <button type="button" class="details-toggle" disabled={!ready()} title="Margin and tries"
+        aria-label={`Details for match ${props.fixture.id}`} aria-haspopup="dialog" aria-controls={`match-${props.fixture.id}-details-dialog`}
+        onClick={(event) => openDetails(event.currentTarget)}><Icon name="sliders" size={18} /></button>
+    </div></Show>
+    <Show when={props.fixture.issues.length > 0}><ul class="fixture-issues" aria-live="polite"><For each={props.fixture.issues}>{(issue) => <li>{issue}</li>}</For></ul></Show>
+    <Show when={props.note && variant() === "row"}><p class="fixture-note"><Icon name="arrow-right" size={14} />{props.note}</p></Show>
   </article>;
 }

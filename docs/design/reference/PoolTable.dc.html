@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+</helmet>
+<div style="font-family:var(--font-body);color:var(--color-ink);font-variant-numeric:tabular-nums;min-width:0">
+  <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:4px;align-items:center;padding:0 0 8px;border-bottom:1px solid var(--color-border-strong);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-muted)">
+      <span></span><span>Team</span><span style="text-align:right">P</span><span style="text-align:right;display:{{ wdl }}">W</span><span style="text-align:right;display:{{ wdl }}">D</span><span style="text-align:right;display:{{ wdl }}">L</span><span style="text-align:right">+/−</span><span style="text-align:right">Pts</span>
+    </div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:{{ cols }};gap:4px;align-items:center;min-height:44px;border-bottom:1px solid var(--color-border-subtle);font-size:15px">
+        <span style="color:var(--color-muted)">{{ r.pos }}</span>
+        <span style="display:flex;align-items:center;gap:6px;min-width:0;font-weight:600">
+          <span title="{{ r.name }}" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+          <sc-if value="{{ r.qual }}"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="circle-check" size="{{ 16 }}" color="var(--color-success)" label="{{ r.qualLabel }}" hint-size="16px,16px"></x-import></sc-if>
+        </span>
+        <span style="text-align:right">{{ r.p }}</span>
+        <span style="text-align:right;display:{{ wdl }}">{{ r.w }}</span>
+        <span style="text-align:right;display:{{ wdl }}">{{ r.d }}</span>
+        <span style="text-align:right;display:{{ wdl }}">{{ r.l }}</span>
+        <span style="text-align:right;color:var(--color-muted)">{{ r.diffText }}</span>
+        <span style="text-align:right;font-weight:700">{{ r.pts }}</span>
+      </div>
+    </sc-for>
+  </sc-if>
+  <sc-if value="{{ compact }}">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:4px;border-bottom:1px solid var(--color-border-strong)">
+      <span style="font-size:14px;font-weight:700">{{ title }}</span>
+      <span style="font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--color-muted)">PTS</span>
+    </div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:16px minmax(0,1fr) 16px 24px;gap:6px;align-items:center;min-height:30px;border-bottom:1px solid var(--color-border-subtle);font-size:14px">
+        <span style="color:var(--color-muted)">{{ r.pos }}</span>
+        <span style="font-weight:600;letter-spacing:.04em">{{ r.code }}</span>
+        <span style="display:flex">
+          <sc-if value="{{ r.qual }}"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="circle-check" size="{{ 14 }}" color="var(--color-success)" label="{{ r.qualLabel }}" hint-size="14px,14px"></x-import></sc-if>
+        </span>
+        <span style="text-align:right;font-weight:700">{{ r.pts }}</span>
+      </div>
+    </sc-for>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:340,&quot;height&quot;:260},&quot;rows&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;compact&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Pool A&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const n = !!this.props.narrow;
+    return { cols: n ? '24px minmax(0,1fr) 28px 40px 32px' : '24px minmax(0,1fr) repeat(4,26px) 36px 32px', wdl: n ? 'none' : 'block', rows: this.props.rows || [], compact: !!this.props.compact, full: !this.props.compact, title: this.props.title || '' };
+  }
+}
+</script>
+</body>
+</html>

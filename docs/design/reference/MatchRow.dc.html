@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/styles.css">
+  <script src="_ds/sunlit-matchday-design-system-347d00e7-60cf-4de5-975f-5d059faa1a3c/_ds_bundle.js"></script>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 4px 8px 12px;border-top:1px solid var(--color-border-subtle);background:var(--color-white);font-family:var(--font-body);color:var(--color-ink)">
+  <div style="flex:0 0 68px">
+    <div style="font-weight:700;font-size:15px;font-variant-numeric:tabular-nums">{{ match.time }}</div>
+    <div style="font-size:12px;line-height:1.3;color:var(--color-muted);white-space:nowrap">{{ match.rowMeta }}</div>
+  </div>
+  <div style="flex:1 1 340px;min-width:0;display:grid;grid-template-columns:{{ cols }};gap:6px;align-items:center">
+    <button type="button" onClick="{{ pickHome }}" disabled="{{ h.dis }}" aria-pressed="{{ match.home.sel }}" title="{{ match.home.label }}" style="min-width:0;height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;border:1px solid {{ h.bd }};box-shadow:{{ h.ring }};border-radius:8px;background:{{ h.bg }};color:{{ h.fg }};cursor:{{ h.cur }};font:600 15px/1 var(--font-body);text-align:left;transition:background 150ms cubic-bezier(.2,.8,.2,1),border-color 150ms cubic-bezier(.2,.8,.2,1)" style-hover="border-color:var(--color-ink)"><img src="{{ match.home.flag }}" alt="" style="display:{{ h.fl }};flex:none;width:22px;height:15px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgb(32 42 39 / .12)"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ match.home.label }}</span><sc-if value="{{ match.home.sel }}"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px"></x-import></sc-if></button>
+    <sc-if value="{{ match.allowDraw }}">
+      <button type="button" onClick="{{ pickDraw }}" aria-pressed="{{ match.drawSel }}" disabled="{{ d.dis }}" style="min-height:44px;padding:0 4px;border:0;background:transparent;color:{{ d.fg }};font:{{ d.fw }} 13px/1 var(--font-body);text-decoration:underline;text-decoration-color:{{ d.ul }};text-underline-offset:3px;cursor:pointer" style-hover="text-decoration-color:var(--color-ink)">Draw</button>
+    </sc-if>
+    <sc-if value="{{ noDraw }}"><span style="font-size:13px;color:var(--color-muted);text-align:center">v</span></sc-if>
+    <button type="button" onClick="{{ pickAway }}" disabled="{{ a.dis }}" aria-pressed="{{ match.away.sel }}" title="{{ match.away.label }}" style="min-width:0;height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;border:1px solid {{ a.bd }};box-shadow:{{ a.ring }};border-radius:8px;background:{{ a.bg }};color:{{ a.fg }};cursor:{{ a.cur }};font:600 15px/1 var(--font-body);text-align:left;transition:background 150ms cubic-bezier(.2,.8,.2,1),border-color 150ms cubic-bezier(.2,.8,.2,1)" style-hover="border-color:var(--color-ink)"><img src="{{ match.away.flag }}" alt="" style="display:{{ a.fl }};flex:none;width:22px;height:15px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgb(32 42 39 / .12)"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ match.away.label }}</span><sc-if value="{{ match.away.sel }}"><x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px"></x-import></sc-if></button>
+  </div>
+  <div style="flex:0 0 auto;margin-left:auto;display:flex;align-items:center;gap:2px">
+    <div style="min-width:84px;text-align:right;white-space:nowrap">
+      <sc-if value="{{ match.picked }}">
+        <div style="font:700 18px/1 var(--font-display);text-transform:uppercase;font-variant-numeric:tabular-nums">{{ match.scoreText }}</div>
+        <div style="font-size:12px;color:var(--color-muted);margin-top:2px">{{ match.triesText }}</div>
+      </sc-if>
+      <sc-if value="{{ notPicked }}"><span style="font-size:13px;color:var(--color-muted)">No pick</span></sc-if>
+    </div>
+    <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.IconButton" icon="sliders-horizontal" label="Margin and tries" variant="ghost" size="sm" disabled="{{ noDetails }}" on-click="{{ openDetails }}" hint-size="44px,44px"></x-import>
+  </div>
+  <sc-if value="{{ match.note }}">
+    <div style="flex:1 0 100%;display:flex;align-items:center;gap:6px;padding-left:80px;font-size:12px;color:var(--color-muted)">
+      <x-import component-from-global-scope="SunlitMatchdayDesignSystem_347d00.Icon" name="corner-down-right" size="{{ 14 }}" hint-size="14px,14px"></x-import>
+      <span>{{ match.note }}</span>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:760,&quot;height&quot;:70},&quot;match&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;onPick&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;onDetails&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;function&quot;},&quot;pickStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;filled&quot;,&quot;outline&quot;],&quot;default&quot;:&quot;filled&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  sty(t, o, drawSel) {
+    t = t || {}; o = o || {};
+    if (!t.known) return { bg: 'var(--color-paper)', fg: 'var(--color-muted)', bd: 'var(--color-border-subtle)', cur: 'default', ring: 'none', dis: true, fl: 'none' };
+    if (t.sel) return this.props.pickStyle === 'outline'
+      ? { bg: 'var(--color-white)', fg: 'var(--color-eucalyptus)', bd: 'var(--color-eucalyptus)', cur: 'pointer', ring: 'inset 0 0 0 1px var(--color-eucalyptus)', dis: false, fl: 'block' }
+      : { bg: 'color-mix(in srgb, var(--color-eucalyptus) 10%, var(--color-white))', fg: 'var(--color-eucalyptus)', bd: 'var(--color-eucalyptus)', cur: 'pointer', ring: 'none', dis: false, fl: 'block' };
+    const lost = o.sel || drawSel;
+    return { bg: 'var(--color-white)', fg: lost ? 'var(--color-muted)' : 'var(--color-ink)', bd: 'var(--color-border-strong)', cur: 'pointer', ring: 'none', dis: false, fl: 'block' };
+  }
+  renderVals() {
+    const m = this.props.match || { home: {}, away: {} };
+    const pick = (s) => () => this.props.onPick && this.props.onPick(m.no, s);
+    const both = !!(m.home && m.home.known && m.away && m.away.known);
+    return {
+      h: this.sty(m.home, m.away, m.drawSel), a: this.sty(m.away, m.home, m.drawSel),
+      d: m.drawSel ? { fg: 'var(--color-eucalyptus)', fw: '700', ul: 'var(--color-eucalyptus)', dis: false } : { fg: 'var(--color-muted)', fw: '600', ul: 'var(--color-border-strong)', dis: !both },
+      cols: 'minmax(0,1fr) 48px minmax(0,1fr)',
+      notPicked: !m.picked, noDetails: !m.canDetails, noDraw: !m.allowDraw,
+      pickHome: pick('h'), pickAway: pick('a'), pickDraw: pick('d'),
+      openDetails: () => this.props.onDetails && this.props.onDetails(m.no),
+    };
+  }
+}
+</script>
+</body>
+</html>

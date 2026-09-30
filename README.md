@@ -1,6 +1,8 @@
 # Rugby World Cup prediction tracker
 
-A lightweight, browser-only predictor for the 2027 Rugby World Cup. Pick winners across six pools and the complete knockout bracket, or expand a match to choose scores, margin, tries and bonus points. Undo, redo and reset work locally; copying the URL shares the whole scenario.
+A lightweight, browser-only predictor for the 2027 Rugby World Cup. Pick winners across six pools and the complete knockout bracket, or open **Details** to choose scores, margin, tries and bonus points. Undo, redo and reset work locally; copying the URL shares the whole scenario.
+
+Browse pools by pool or timeline, then unlock knockout rounds, timeline and bracket views once every pool result is valid. Standings sit beside matches on desktop and stack on mobile. View and filter changes leave predictions and the URL untouched. Details edits apply immediately as one undoable session; **Clear pick** is a separate action. [Design reference](docs/design/README.md)
 
 Unspecified details use deterministic suggestions. Live odds and the calibrated forecasting engine are follow-ups. The official 52-match schedule is included; final 2027 tie regulations and the future ranking snapshot remain provisional. [Sources and assumptions](docs/tournament-sources.md)
 

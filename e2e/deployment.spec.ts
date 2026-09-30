@@ -37,7 +37,13 @@ for (const [path, tournament, poolCount] of [
     if (tournament === "2023") {
       expect(legacyPayload).toContain("/");
       await expect(page.locator(".eyebrow")).toHaveText("Legacy 2023 tournament");
-      await expect(page.locator('[data-fixture-id="1"] .result-preview strong')).toHaveText("255 – 255");
+      await page.locator('[data-fixture-id="1"] .details-toggle').click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator(".match-dialog-preview strong")).toHaveText("255 – 255");
+      await expect(dialog.locator("#match-1-homeScore")).toHaveValue("255");
+      await expect(dialog.locator("#match-1-awayScore")).toHaveValue("255");
+      await dialog.getByRole("button", { name: "Done", exact: true }).click();
     }
     expect(page.url()).toBe(expectedUrl);
   });
