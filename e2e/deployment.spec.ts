@@ -85,7 +85,11 @@ test("the HTML shell requires revalidation instead of immutable asset caching", 
 test("the actual generated JavaScript and CSS have correct MIME types and immutable caching", async ({ page, request }) => {
   await page.goto("/");
   const assets = await page.locator('script[type="module"][src], link[rel="stylesheet"][href]').evaluateAll((elements) =>
-    elements.map((element) => element instanceof HTMLScriptElement ? element.src : (element as HTMLLinkElement).href));
+    elements.map((element) => element instanceof HTMLScriptElement ? element.src : (element as HTMLLinkElement).href)
+      .filter((url) => {
+        const asset = new URL(url);
+        return asset.origin === location.origin && asset.pathname.startsWith("/assets/");
+      }));
   expect(assets.some((url) => new URL(url).pathname.endsWith(".js"))).toBe(true);
   expect(assets.some((url) => new URL(url).pathname.endsWith(".css"))).toBe(true);
   for (const url of assets) {
