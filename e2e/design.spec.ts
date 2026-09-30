@@ -24,6 +24,7 @@ async function done(page: Page): Promise<void> {
 }
 
 test("pool filters and views preserve the shared URL and prediction undo session", async ({ page }) => {
+  test.setTimeout(60000);
   await page.goto("/");
   await card(page, 1).getByRole("button", { name: "Australia", exact: true }).click();
   const pickedUrl = page.url();
@@ -50,6 +51,38 @@ test("pool filters and views preserve the shared URL and prediction undo session
   expect(new URL(page.url()).hash).toBe("");
   await page.getByRole("group", { name: "Pool filter", exact: true }).getByRole("button", { name: "All", exact: true }).click();
   await expect(card(page, 1).getByRole("button", { name: "Australia", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await pickPools(page);
+  const completedUrl = page.url();
+  await view(page).getByRole("button", { name: "Timeline", exact: true }).click();
+  const compact = page.locator(".standings--compact");
+  const expectedCodes = ["NZL", "AUS", "CHI", "HKG", "RSA", "ITA", "GEO", "ROU", "ARG", "FIJ", "ESP", "CAN", "IRE", "SCO", "URU", "POR", "FRA", "JPN", "USA", "SAM", "ENG", "WAL", "TGA", "ZIM"].sort();
+  for (const width of [375, 320]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expect(compact).toHaveCount(6);
+    expect((await compact.locator(".standing-team-name").allTextContents()).sort()).toEqual(expectedCodes);
+    await expect(compact.locator(".standing-qualification .qualified-badge")).toHaveCount(16);
+    const readable = await compact.evaluateAll((tables) => tables.every((table) => {
+      const fitsCell = (element: Element, cell: Element | null): boolean => {
+        if (!cell) return false;
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const text = range.getBoundingClientRect();
+        const bounds = cell.getBoundingClientRect();
+        return text.width > 0 && text.left >= bounds.left - 1 && text.right <= bounds.right + 1 &&
+          element.scrollWidth <= element.clientWidth && text.height <= bounds.height;
+      };
+      return [...table.querySelectorAll(".standing-team-name")].every((code) => fitsCell(code, code.closest("th"))) &&
+        [...table.querySelectorAll(".standing-points")].every((points) => /^\d+$/.test(points.textContent ?? "") && fitsCell(points, points.closest("td"))) &&
+        [...table.querySelectorAll(".qualified-badge")].every((badge) => {
+          const cell = badge.closest(".standing-qualification")?.getBoundingClientRect();
+          const mark = badge.getBoundingClientRect();
+          return cell && mark.width > 0 && mark.left >= cell.left - 1 && mark.right <= cell.right + 1;
+        });
+    }));
+    expect(readable, `Completed standings must keep every code, points value and qualification mark readable at ${width}px`).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    expect(page.url()).toBe(completedUrl);
+  }
 });
 
 test("clicking the selected winner clears its entire pick and undo restores the details", async ({ page }) => {

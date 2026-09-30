@@ -4,6 +4,8 @@ A lightweight, browser-only predictor for the 2027 Rugby World Cup. Pick winners
 
 Browse pools by pool or timeline, then unlock knockout rounds, timeline and bracket views once every pool result is valid. Standings sit beside matches on desktop and stack on mobile. View and filter changes leave predictions and the URL untouched. Details edits apply immediately as one undoable session; **Clear pick** is a separate action. [Design reference](docs/design/README.md)
 
+Shared links use sparse v3 bit-packing: one winner takes a nine-character token and 52 winner/advancement choices take 129; older links remain readable. [Prediction-link format](docs/prediction-links.md)
+
 Unspecified details use deterministic suggestions. Live odds and the calibrated forecasting engine are follow-ups. The official 52-match schedule is included; final 2027 tie regulations and the future ranking snapshot remain provisional. [Sources and assumptions](docs/tournament-sources.md)
 
 ## Development

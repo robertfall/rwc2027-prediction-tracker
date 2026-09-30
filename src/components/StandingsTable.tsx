@@ -22,6 +22,7 @@ export function StandingsTable(props: StandingsTableProps) {
   return <div classList={{ "standings-wrap": true, "standings-wrap--compact": Boolean(props.compact) }}>
     <Show when={props.compact}><div class="compact-table-heading"><h3>Pool {props.pool}</h3><span>Pts</span></div></Show>
     <table classList={{ standings: true, "standings--compact": Boolean(props.compact) }} aria-label={`Pool ${props.pool} standings`}>
+      <Show when={props.compact}><colgroup><col class="standing-col-position" /><col class="standing-col-team" /><col class="standing-col-qualification" /><col class="standing-col-points" /></colgroup></Show>
       <thead classList={{ "sr-only": Boolean(props.compact) }}><tr>
         <th scope="col"><span class="sr-only">Position</span></th><th scope="col">Team</th>
         <Show when={!props.compact}>
@@ -31,14 +32,16 @@ export function StandingsTable(props: StandingsTableProps) {
           <th class="standing-wdl" scope="col"><abbr title="Losses">L</abbr></th>
           <th scope="col"><abbr title="Points difference">+/−</abbr></th>
         </Show>
+        <Show when={props.compact}><th scope="col"><span class="sr-only">Qualification</span></th></Show>
         <th scope="col">Pts</th>
       </tr></thead>
       <tbody><For each={props.standings}>{(standing, index) => <tr classList={{ "qualifying-row": qualified(index()) }}>
         <td class="standing-position">{index() + 1}</td>
         <th scope="row"><span class="standing-team" title={teams().get(standing.teamId)?.name}>
           <span class="standing-team-name">{props.compact ? teams().get(standing.teamId)?.shortName : teams().get(standing.teamId)?.name}</span>
-          <Show when={qualified(index())}><span class="qualified-badge" title={qualificationLabel(index())}><Icon name="check" /><span class="sr-only">, {qualificationLabel(index())}</span></span></Show>
+          <Show when={!props.compact && qualified(index())}><span class="qualified-badge" title={qualificationLabel(index())}><Icon name="check" /><span class="sr-only">, {qualificationLabel(index())}</span></span></Show>
         </span></th>
+        <Show when={props.compact}><td class="standing-qualification"><Show when={qualified(index())}><span class="qualified-badge" title={qualificationLabel(index())}><Icon name="check" /><span class="sr-only">{qualificationLabel(index())}</span></span></Show></td></Show>
         <Show when={!props.compact}>
           <td>{standing.played}</td><td class="standing-wdl">{standing.wins}</td><td class="standing-wdl">{standing.draws}</td><td class="standing-wdl">{standing.losses}</td><td class="standing-difference">{difference(standing)}</td>
         </Show>

@@ -50,8 +50,8 @@
 .pool-heading > span { color: var(--color-muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .standings { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
 .standings thead th { text-align: right; color: var(--color-muted); padding: 8px 2px; font-size: 11px; font-weight: 700; letter-spacing: .1em; border-bottom: 1px solid var(--color-border-strong); }
-.standings thead th:first-child { width: 20px; }
-.standings thead th:nth-child(2) { text-align: left; width: 40%; }
+.standings:not(.standings--compact) thead th:first-child { width: 20px; }
+.standings:not(.standings--compact) thead th:nth-child(2) { text-align: left; width: 40%; }
 .standings abbr { text-decoration: none; }
 .standings tbody td, .standings tbody th { padding: 12px 2px; text-align: right; border-bottom: 1px solid var(--color-border-subtle); font-variant-numeric: tabular-nums; }
 .standings tbody th { text-align: left; font-weight: 600; }
@@ -75,8 +75,11 @@
 .compact-table-heading > span { font-size: 11px; color: var(--color-muted); }
 .standings--compact { font-size: 13px; }
 .standings--compact tbody td, .standings--compact tbody th { padding-block: 8px; }
-.standings--compact .standing-position { width: 14px; }
-.standings--compact .standing-points { width: 22px; }
+.standings--compact .standing-col-position { width: 16px; }
+.standings--compact .standing-col-qualification { width: 18px; }
+.standings--compact .standing-col-points { width: 26px; }
+.standings--compact .standing-team-name { overflow: visible; text-overflow: clip; }
+.standings--compact .standing-qualification .qualified-badge { justify-content: center; }
 .compact-standings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; }
 .context-heading { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 16px; }
 .fixture-card { background: white; border: 1px solid var(--color-border-subtle); border-radius: 12px; padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -247,7 +250,7 @@
   .timeline-context { position: static; }
   .compact-standings-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .standing-wdl { display: table-cell; }
-  .standings thead th:nth-child(2) { width: 40%; }
+  .standings:not(.standings--compact) thead th:nth-child(2) { width: 40%; }
 }
 @media (max-width: 719px) {
   .app-header { position: static; }
@@ -269,7 +272,7 @@
   .pool-context { margin-bottom: 4px; }
   .standings { font-size: 14px; }
   .standing-wdl { display: none; }
-  .standings thead th:nth-child(2) { width: 50%; }
+  .standings:not(.standings--compact) thead th:nth-child(2) { width: 50%; }
   .fixture-draw { margin-block: -4px; }
   .draw-choice { min-height: 36px; }
   .winner-choice { padding-inline: 8px; }

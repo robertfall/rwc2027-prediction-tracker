@@ -1,9 +1,10 @@
-import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
+import { inflateSync, strFromU8 } from "fflate";
 import type { CompletedResult, Prediction, Scenario, Tournament, Winner } from "../domain/types";
 import { intentFields, validateIntent, type IntentField } from "../domain/completion";
 import { getTournament } from "../domain/tournaments";
 import { deriveScenario } from "../domain/derive";
 import { decode as decodeLegacy, PredictionLinkError } from "../services/results/compression";
+import { MAX_COMPACT_BYTES, packCompact, unpackCompact } from "./compact-codec";
 
 export { PredictionLinkError };
 const MAX_RAW_BYTES = 16384;
@@ -80,8 +81,8 @@ export function validateScenario(value: unknown): asserts value is Scenario {
 function toBase64url(bytes: Uint8Array): string {
   return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join("")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-function fromBase64url(value: string): Uint8Array {
-  if (!value || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > Math.ceil(MAX_FRAME_BYTES * 4 / 3) || value.length % 4 === 1) invalid();
+function fromBase64url(value: string, maximumBytes = MAX_FRAME_BYTES): Uint8Array {
+  if (!value || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > Math.ceil(maximumBytes * 4 / 3) || value.length % 4 === 1) invalid();
   try {
     const bytes = Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), (character) => character.charCodeAt(0));
     if (toBase64url(bytes) !== value) invalid();
@@ -89,33 +90,9 @@ function fromBase64url(value: string): Uint8Array {
   } catch { return invalid(); }
 }
 
-function pack(scenario: Scenario): unknown[] {
-  const rows = Object.entries(scenario.predictions).sort(([a], [b]) => Number(a) - Number(b)).map(([id, prediction]) => {
-    let mask = 0;
-    const values: unknown[] = [];
-    intentFields.forEach((field, index) => {
-      if (prediction.intent[field] !== undefined) { mask |= 1 << index; values.push(prediction.intent[field]); }
-    });
-    const result = scenario.resolved?.[Number(id)];
-    return [Number(id), mask, values, prediction.participants ?? null, result ?
-      [result.homeScore, result.awayScore, result.homeTries, result.awayTries, result.winner, result.advancing ?? null] : null];
-  });
-  return [scenario.rulesVersion, scenario.completionVersion, rows];
-}
-
 export function encodeScenario(scenario: Scenario): string {
   validateScenario(scenario);
-  const raw = strToU8(JSON.stringify(pack(scenario)));
-  if (raw.length > MAX_RAW_BYTES) invalid("This prediction set is too large to share.");
-  const compressed = deflateSync(raw, { level: 6 });
-  const frame = new Uint8Array(compressed.length + 4);
-  frame[0] = raw.length >> 8;
-  frame[1] = raw.length & 255;
-  frame[2] = compressed.length >> 8;
-  frame[3] = compressed.length & 255;
-  frame.set(compressed, 4);
-  if (frame.length > MAX_FRAME_BYTES) invalid("This prediction set is too large to share.");
-  return `v2.${scenario.tournamentId}.${scenario.datasetVersion}.${toBase64url(frame)}`;
+  return `v3.${toBase64url(packCompact(scenario))}`;
 }
 
 function unpack(value: unknown, tournament: Tournament): Scenario {
@@ -177,6 +154,13 @@ function importLegacy(encoded: string): Scenario {
 }
 
 export function decodeScenario(encoded: string): Scenario {
+  if (encoded.startsWith("v3.")) {
+    const parts = encoded.split(".");
+    if (parts.length !== 2) invalid();
+    const scenario = unpackCompact(fromBase64url(parts[1], MAX_COMPACT_BYTES));
+    validateScenario(scenario);
+    return scenario;
+  }
   if (!encoded.startsWith("v2.")) {
     if (/^v\d+\./.test(encoded) && !encoded.startsWith("v1.")) invalid("This prediction link uses an unsupported version.");
     return importLegacy(encoded);

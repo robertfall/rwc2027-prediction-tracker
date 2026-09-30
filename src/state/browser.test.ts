@@ -3,6 +3,8 @@ import { createBrowserController, type BrowserAdapter } from "./browser";
 import { encodeScenario } from "./codec";
 import { createScenarioController } from "./controller";
 
+const originalV2 = "v2.rwc2027.fixtures-2026-02.AE4ARItWKijKL8sszszPS8zRLTNU0lFKSU1LLM0pKQbzoqMNdQx1opUy8nNTlWJ18kpzcnSijUx0DM11jHWMdCDiYOFYIAAA";
+
 function adapter(initial = "/") {
   let current = new URL(initial, "https://predict.example");
   const writes: string[] = [];
@@ -34,7 +36,7 @@ describe("Browser URL and history ownership", () => {
     app.controller.update(1, { homeScore: 2 }, "field");
     app.controller.update(1, { homeScore: 24 }, "field");
     expect(web.writes).toHaveLength(2);
-    expect(web.url()).toContain("/?from=friend#predictions=v2.rwc2027");
+    expect(web.url()).toContain("/?from=friend#predictions=v3.");
     app.controller.undo();
     expect(web.url()).toBe("/?from=friend");
     app.controller.redo();
@@ -48,7 +50,7 @@ describe("Browser URL and history ownership", () => {
     const app = createBrowserController(web.web, "/");
     app.controller.reset();
     expect(app.controller.getState().scenario.predictions).toEqual({});
-    expect(web.url()).toContain("#predictions=v2.rwc2023.fixtures-v1.");
+    expect(web.url()).toContain("#predictions=v3.AoA");
     const fresh = createBrowserController(adapter(web.url()).web, "/");
     expect(fresh.controller.getState().scenario.tournamentId).toBe("rwc2023");
     expect(fresh.controller.getState().scenario.predictions).toEqual({});
@@ -82,8 +84,40 @@ describe("Browser URL and history ownership", () => {
       expect(web.writes).toEqual([]);
       expect(app.controller.getState().scenario.tournamentId).toBe("rwc2023");
       app.controller.update(2, { winner: "home" });
-      expect(web.url()).toContain("/#predictions=v2.rwc2023.fixtures-v1.");
+      expect(web.url()).toContain("/#predictions=v3.");
+      expect(createBrowserController(adapter(web.url()).web, "/").controller.getState().scenario.tournamentId).toBe("rwc2023");
     }
+  });
+
+  it("hydrates an original v2 link unchanged, then writes a sparse v3 link after editing", () => {
+    const web = adapter(`/?from=friend#predictions=${originalV2}`);
+    const app = createBrowserController(web.web, "/");
+    expect(app.urlError()).toBeUndefined();
+    expect(web.writes).toEqual([]);
+    expect(web.url()).toContain(originalV2);
+    expect(app.controller.getState().scenario.resolved?.[1]).toEqual({ homeScore: 24, awayScore: 17, homeTries: 3, awayTries: 2, winner: "home" });
+    app.controller.update(2, { winner: "away" });
+    expect(web.url()).toContain("/?from=friend#predictions=v3.");
+    expect(new URL(web.url(), "https://predict.example").hash.length).toBeLessThanOrEqual(28);
+    const replay = createBrowserController(adapter(web.url()).web, "/");
+    expect(replay.controller.getState().scenario).toEqual(app.controller.getState().scenario);
+    expect(replay.controller.getState().canUndo).toBe(false);
+    app.controller.undo();
+    expect(web.url()).toBe("/?from=friend#predictions=v3.AYIKQA");
+  });
+
+  it("keeps an explicit zero and false bonus through compact sharing and navigation", () => {
+    const web = adapter();
+    const app = createBrowserController(web.web, "/");
+    app.controller.update(1, { homeTries: 0, homeTryBonus: false });
+    const picked = app.controller.getState().scenario;
+    const url = web.url();
+    expect(createBrowserController(adapter(url).web, "/").controller.getState().scenario).toEqual(picked);
+    web.navigate("/");
+    web.navigate(url);
+    expect(app.controller.getState().scenario.predictions[1].intent).toEqual({ homeTries: 0, homeTryBonus: false });
+    expect(app.controller.getState().canUndo).toBe(false);
+    expect(web.writes).toHaveLength(1);
   });
 
   it.each(["/broken", "/%E0%A4%A", "/#predictions=invalid", "/#other", "/#predictions=v3.rwc2027.anything.AAAA"])("preserves invalid addresses until explicit recovery (%s)", (url) => {
@@ -115,7 +149,7 @@ describe("Browser URL and history ownership", () => {
     const web = adapter("/tracker/?from=friend");
     const app = createBrowserController(web.web, "/tracker/");
     app.controller.update(1, { winner: "home" });
-    expect(web.url()).toContain("/tracker/?from=friend#predictions=v2.");
+    expect(web.url()).toContain("/tracker/?from=friend#predictions=v3.");
     web.navigate("/tracker/#predictions=broken");
     app.recover();
     expect(web.url()).toBe("/tracker/");

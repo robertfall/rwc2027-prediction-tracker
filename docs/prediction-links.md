@@ -1,0 +1,41 @@
+# Prediction links
+
+New writes use `#predictions=v3.<base64url>`: a sparse bit-packed token containing only picked/edited fixtures. The browser omits the fragment for an empty default 2027 scenario; an empty legacy 2023 scenario keeps its identity in a six-character token. `src/state/browser.ts` remains the sole URL writer. Loading an older link preserves its address until a prediction action writes the current format.
+
+`src/state/codec.ts` validates scenarios and selects readers. `src/state/compact-codec.ts` defines v3. The in-memory scenario schema remains version 2; transport version 3 changes its representation.
+
+| Profile byte | Permanent inputs |
+| --- | --- |
+| 1 | 2027, `fixtures-2026-02`, `provisional-v1`, `defaults-v1`, draw-date rankings from 1 December 2025 |
+| 2 | 2023, `fixtures-v1`, `2023-v1`, `defaults-v1`, rankings from 2 October 2023 |
+
+Each profile also fixes the team-ID/index order. Retain its tournament, rules, rankings and completion implementation permanently. Add a new profile when any input or index order changes; never reinterpret an existing byte with newer defaults.
+
+The stream uses most-significant bits first:
+
+| Part | Bits and meaning |
+| --- | --- |
+| Header | 8 profile ID, 1 resolved-map presence, 6 record count |
+| Record | 6 fixture ID, 2 common-choice shortcut |
+| General intent | If shortcut is zero: 11 field-presence bits, then typed values for present fields |
+| Participant binding | 1 presence bit; when present, two 5-bit team indices |
+| Saved result | 2 mode bits: absent, exact profile default, or explicit exception |
+
+Pool shortcuts encode home/away/draw; knockout shortcuts encode home/away advancement. General fields follow the fixed order `winner`, `advancing`, `margin`, home/away scores, home/away tries, home/away try bonuses, home/away losing bonuses. Winner uses 2 bits, intent advancement and booleans use 1, scores/margin use 8, and tries use 4. Presence preserves missing values separately from explicit zero or false, including contradictory intent.
+
+Default result mode is used only when the pinned result exactly equals completion under the immutable profile and participants. Otherwise an exception stores both scores (8 bits each), both try counts (4 bits each) and optional advancement (2 bits); winner derives from scores. This preserves custom pins such as 81–80 and dormant bound knockout choices while earlier fixtures are unresolved. Invalid completed pins are rejected rather than substituted.
+
+V3 is bounded to **1,024 decoded bytes** and the selected tournament's fixture count. Records use strictly increasing valid fixture IDs; duplicate/foreign IDs, unknown profiles, invalid team indices and inconsistent saved outcomes are rejected. Base64url is unpadded and its tail bits must be canonical. Readers also reject trailing bytes and nonzero final bit padding. Malformed URLs remain intact until explicit recovery.
+
+Readers retain v2 deflated JSON frames, v1 2023 fragment links and ordinary-Base64 2023 paths. V2 remains bounded to an 8 KiB frame and 16 KiB inflated payload. Keep fixed golden examples for every transport/profile and tiny/sparse size regression cases when extending the codec.
+
+Measured token lengths include the version prefix and exclude the hostname/path and `#predictions=`:
+
+| Representative scenario | Historical v2 | V3 |
+| --- | ---: | ---: |
+| One winner choice | 124 | 9 (`v3.AYIKQA`) |
+| One detailed match: margin 15 and try bonus | 134 | 11 |
+| All 36 pool winners | 250 | 73 |
+| All 52 winner/advancement choices with bindings | 468 | 129 |
+
+These fixed representative budgets protect shallow sharing; richer explicit outcomes can require more bits. Links retain intent, valid completed outcomes and version identity, while view/filter state and undo history stay local.

@@ -25,6 +25,8 @@ test("winner-first edits, grouped undo and links replay in a fresh browser", asy
   const first = card(page, 1);
   await first.getByRole("button", { name: "Australia", exact: true }).click();
   await expect(first.locator(".result-preview strong")).toHaveText(/by\s+7/i);
+  expect(new URL(page.url()).hash).toMatch(/^#predictions=v3\.[A-Za-z0-9_-]+$/);
+  expect(new URL(page.url()).hash.length).toBeLessThanOrEqual(24);
   const australia = page.getByRole("table", { name: "Pool A standings", exact: true }).getByRole("row").filter({ hasText: "Australia" });
   await expect(australia.locator(".standing-points")).toHaveText("4");
   await details(page, 1);
@@ -53,7 +55,7 @@ test("winner-first edits, grouped undo and links replay in a fresh browser", asy
   await expect(margin).toHaveValue("15");
   await expect(dialog(page).locator("#match-1-homeTries")).toHaveValue("4");
   const savedUrl = page.url();
-  expect(savedUrl).toContain("#predictions=v2.rwc2027.fixtures-2026-02.");
+  expect(savedUrl).toContain("#predictions=v3.");
   expect(await page.evaluate(() => history.length)).toBe(initialHistory);
   await dialog(page).locator("#match-1-homeScore").fill("256");
   await expect(dialog(page).locator("#match-1-homeScore")).toHaveAttribute("aria-invalid", "true");
@@ -133,7 +135,7 @@ test("all 52 matches resolve, including bronze, and upstream changes undo atomic
   const finalTeams = await card(page, 52).locator(".winner-choice").allTextContents();
   const finalSummary = (await card(page, 52).locator(".result-preview").textContent()) ?? "";
   const fullUrl = page.url();
-  expect(fullUrl.length).toBeLessThan(2000);
+  expect(new URL(fullUrl).hash.length).toBeLessThanOrEqual(160);
   const shared = await browser.newPage();
   await shared.goto(fullUrl);
   await shared.getByRole("button", { name: /\bKnockout\b/ }).click();

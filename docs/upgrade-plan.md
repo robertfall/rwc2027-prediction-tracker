@@ -25,15 +25,32 @@ The first product milestone is complete and the initial build is deployed. Push-
 - The official 2027 definition contains 24 teams, six pools and all 52 fixtures, including venue-local timezone/DST conversion, all 15 third-place allocations and bronze. Original 2023 datasets and both legacy URL formats remain supported. [Verified sources and provisional rules](tournament-sources.md)
 - Winner choices fill unspecified scores/tries; details expose margin, scores, tries and explicit/automatic try and losing bonuses. Conflicting intent remains visible and cannot affect qualification. A regulation draw can have a separate knockout advancing choice.
 - Framework-independent actions use immutable snapshots and grouped history. The shared Details dialog applies edits live as one session group; closing retains edits and Clear pick is separate. Changes to known participants clear dependent choices atomically; temporarily unresolved matchups retain dormant picks. Reset is undoable. Imports start fresh session history.
-- Versioned `v2` fragment links retain intent, valid resolved outcomes, participant bindings and dataset/rule/completion identity. Editing uses one `replaceState` writer. Empty legacy scenarios retain 2023 identity; malformed links remain untouched until recovery. Compression and decompression are bounded.
-- React, React DOM, Zustand, Immer, Valibot and their renderer-specific tooling are removed. `fflate` is now used: a completed 52-match payload is 468 characters, versus 9,250 for raw scenario JSON encoded as Base64url. TanStack remains a future, individually justified addition.
+- Versioned `v3` fragment links use sparse bit-packing with immutable tournament/rules/default profiles. They retain intent, valid resolved outcomes and participant bindings, with v2/v1/ordinary-Base64 readers preserved. Editing uses one `replaceState` writer. Empty legacy scenarios retain 2023 identity; malformed links remain untouched until recovery. Payloads and legacy decompression are bounded. [Link format](prediction-links.md)
+- React, React DOM, Zustand, Immer, Valibot and their renderer-specific tooling are removed. `fflate` remains for reading historical v2 links: that writer produced a completed 52-match token of 468 characters, versus 9,250 for raw scenario JSON encoded as Base64url. Current writes use v3 below. TanStack remains a future, individually justified addition.
 - Initial delivery verification passed **179 unit/property tests**, both TypeScript compilers, lint and production build. **Six Playwright production-browser journeys** covered winner/detail editing, grouped and dependent undo, all 52 matches, fresh-browser sharing, reset, bonuses/conflicts, malformed/legacy links, Back/Forward, clipboard, keyboard, focus and 375px layout. Eight hosting tests brought that suite to 14. The first push's remote CI checks passed; all 14 tests also passed against the deployed custom domain.
 
-### Supplied design verification
+### Sparse link restoration
+
+The current v3 writer stores only changed fixture records. An immutable profile byte pins tournament, dataset, rules, ranking inputs, completion and team-index order; common winner/advancement choices use a two-bit shortcut. Deeper choices keep field presence, including explicit zero/false and contradictions. Exact default pins reconstruct only under that retained profile; custom resolved outcomes and dormant participant bindings remain explicit. One browser URL writer and all previous readers are retained.
+
+| Representative token, including version prefix | Historical v2 | Current v3 |
+| --- | ---: | ---: |
+| One winner choice | 124 characters | 9 characters |
+| One detailed match: margin 15 and try bonus | 134 | 11 |
+| All 36 pool winners | 250 | 73 |
+| All 52 winner/advancement choices | 468 | 129 |
+
+An empty default 2027 scenario needs no prediction fragment; empty 2023 identity takes six token characters. The codec bounds v3 to 1,024 bytes and rejects noncanonical tails, extra bytes, duplicate IDs and invalid pins. Keep golden historical/profile examples and these fixed tiny/sparse budgets when extending the format.
+
+The updated checks pass with **203 unit/property tests and 21 browser/hosting tests**, both TypeScript compilers, lint, production build and Cloudflare dry run. Compact standings now reserve separate columns for team codes, qualification marks and points; all 24 codes fit at 320px and 375px with complete pool results.
+
+The current build is **109.46 kB JavaScript / 32.69 kB gzip** and **27.79 kB CSS / 5.91 kB gzip**, excluding fonts/flags. On the same standalone Chrome benchmark, 82 actions recorded median/p95 times of **3.3/4.8 ms normally** and **14.3/16.5 ms at four-times CPU slowdown**, with no external/fetch/XHR edit requests or page errors. The detailed final URL was 166 characters including the local origin. One cached completion per profile/fixture avoids resolving unchanged defaults again during serialization; decoded outcomes remain independent values.
+
+### Supplied design verification (before v3)
 
 The final HTML composition now drives the Solid interface, with the actual domain/state preserved. Pool views offer By pool and Timeline; knockout offers Rounds, Timeline and a source-linked Bracket, with mobile round selection and bronze. Standings sit beside matches on desktop and stack on mobile, above matches in By pool. View/filter changes never write prediction URLs. The prototype preview bundle is not shipped.
 
-Checks pass with **179 unit/property tests and 21 production-browser/hosting tests**, both TypeScript compilers, lint and build. Added journeys cover phase gating and conflict recovery, view/filter isolation, dialog-session and Clear pick history, keyboard focus, actual bracket ordering, mobile finals and legacy 2023 views.
+At the design checkpoint, checks passed with **179 unit/property tests and 21 production-browser/hosting tests**, both TypeScript compilers, lint and build. Added journeys covered phase gating and conflict recovery, view/filter isolation, dialog-session and Clear pick history, keyboard focus, actual bracket ordering, mobile finals and legacy 2023 views.
 
 The refreshed production build contains **109.29 kB JavaScript / 33.84 kB gzip** and **27.47 kB CSS / 5.87 kB gzip**. Source Sans 3 and Barlow Condensed are self-hosted with OFL licences; icons use inline SVG and flags remain local. Bundle figures exclude font and flag files.
 
@@ -79,7 +96,7 @@ All 14 browser/HTTP tests pass locally, against the Workers address and against 
 
 ### Dependency destination for the Solid path (implemented)
 
-npm and the lockfile are retained. The historical table below inventories the original direct dependencies; removed packages did not need intermediate major upgrades. Current runtime dependencies are only Solid and the bounded URL compressor.
+npm and the lockfile are retained. The historical table below inventories the original direct dependencies; removed packages did not need intermediate major upgrades. Current runtime dependencies are only Solid and `fflate` for older compressed links.
 
 | Destination | Packages and action |
 | --- | --- |
@@ -88,7 +105,7 @@ npm and the lockfile are retained. The historical table below inventories the or
 | **Build and types** | Upgrade Vite/Vitest together; pin Node 24 LTS, npm and explicit Node 24 types. Make TypeScript 6 checks clean before conditional TypeScript 7 adoption; preserve the compiler API needed by lint tooling as described below. |
 | **Lint** | Use flat ESLint with `typescript-eslint` and `eslint-plugin-solid`; remove the legacy config/CLI patterns at the same boundary. |
 | **Verification** | Retain upgraded fast-check for meaningful codec/domain properties. Add Solid Testing Library only for necessary component tests and Playwright for cross-boundary browser behavior. Remove old React/Zustand-specific tests only as their behavioral contracts gain replacement coverage. |
-| **Unused dependencies/assets** | Valibot is removed; fflate is retained for measured URL savings. Prune unused flags/country data and duplicate styles while preserving provenance and legacy-link support. |
+| **Unused dependencies/assets** | Valibot is removed; fflate is retained for v2 link compatibility. Prune unused flags/country data and duplicate styles while preserving provenance and legacy-link support. |
 | **TanStack** | Add individual Solid adapters only when the associated behavior warrants them; Router is the first candidate. Start/Store/DB are outside the initial stack. |
 
 Installed tooling: **Node 24.21.0 / npm 12.1.0**, **Vite 8.3.1 / Vitest 5.0.2**, **TypeScript 7.0.2** with the **6.0.2 compatibility package**, **ESLint 10.11.0 / typescript-eslint 8.71.0**, **Playwright 1.63.0 / fast-check 4.10.2**, **globals 17.12.0** and Node 24 types. `npm ci` reproduces the lockfile successfully with zero reported audit vulnerabilities. The compatibility package exposes the TS6 compiler/API while the native compiler owns `tsc`; checks run both.
