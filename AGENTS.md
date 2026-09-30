@@ -7,7 +7,7 @@
 - Let users stay shallow or go deep: pick a winner or pool draw, then optionally edit margin, scores, tries and bonuses. Open Details on request and distinguish suggested values from explicit choices.
 - Keep one compact sticky toolbar and dense match views. Matches are the main column; standings sit to the right on desktop and stack on mobile (above matches in By pool). Use the [supplied design](docs/design/README.md); keep explanations in tooltips or the footer.
 - Explicit choices take precedence. Preserve contradictory intent, show the conflict, and exclude conflicting results from standings and qualification.
-- Make meaningful changes reversible, including reset and downstream bracket consequences. Preserve focus, keyboard access and mobile usability; measure before adding dependencies or rendering work.
+- Make meaningful changes reversible, including reset and downstream bracket consequences. Preserve focus, keyboard access and mobile usability; wrap full match-team names without truncation and keep team choices at least 44px tall. Measure before adding dependencies or rendering work.
 
 ## Repository map
 

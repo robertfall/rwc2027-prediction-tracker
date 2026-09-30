@@ -42,9 +42,9 @@ The current v3 writer stores only changed fixture records. An immutable profile 
 
 An empty default 2027 scenario needs no prediction fragment; empty 2023 identity takes six token characters. The codec bounds v3 to 1,024 bytes and rejects noncanonical tails, extra bytes, duplicate IDs and invalid pins. Keep golden historical/profile examples and these fixed tiny/sparse budgets when extending the format.
 
-The updated checks pass with **203 unit/property tests and 21 browser/hosting tests**, both TypeScript compilers, lint, production build and Cloudflare dry run. Compact standings now reserve separate columns for team codes, qualification marks and points; all 24 codes fit at 320px and 375px with complete pool results.
+The updated checks pass with **203 unit/property tests and 21 browser/hosting tests**, both TypeScript compilers, lint, production build and Cloudflare dry run. Compact standings now reserve separate columns for team codes, qualification marks and points; all 24 codes fit at 320px and 375px with complete pool results. Mobile match choices use 14px text, 18px-wide flags and natural wrapping instead of a two-line clamp, preserving full team names and 44px team-choice targets.
 
-The current build is **109.46 kB JavaScript / 32.69 kB gzip** and **27.79 kB CSS / 5.91 kB gzip**, excluding fonts/flags. On the same standalone Chrome benchmark, 82 actions recorded median/p95 times of **3.3/4.8 ms normally** and **14.3/16.5 ms at four-times CPU slowdown**, with no external/fetch/XHR edit requests or page errors. The detailed final URL was 166 characters including the local origin. One cached completion per profile/fixture avoids resolving unchanged defaults again during serialization; decoded outcomes remain independent values.
+The current build is **109.46 kB JavaScript / 32.69 kB gzip** and **27.87 kB CSS / 5.90 kB gzip**, excluding fonts/flags. On the same standalone Chrome benchmark, 82 actions recorded median/p95 times of **3.3/4.8 ms normally** and **14.3/16.5 ms at four-times CPU slowdown**, with no external/fetch/XHR edit requests or page errors. The detailed final URL was 166 characters including the local origin. One cached completion per profile/fixture avoids resolving unchanged defaults again during serialization; decoded outcomes remain independent values.
 
 ### Supplied design verification (before v3)
 

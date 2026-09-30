@@ -23,6 +23,31 @@ async function done(page: Page): Promise<void> {
   await expect(dialog(page)).not.toBeVisible();
 }
 
+async function expectReadableTeamChoices(page: Page): Promise<void> {
+  const failures = await page.locator(".fixture-card .winner-choice").evaluateAll((buttons) => buttons.flatMap((button) => {
+    const label = button.querySelector(".team-label > span");
+    const flag = button.querySelector(".team-flag");
+    if (!label || !flag) return [{ name: button.textContent?.trim(), reason: "Missing team name or flag" }];
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const lines = [...range.getClientRects()];
+    const bounds = button.getBoundingClientRect();
+    const labelBounds = label.getBoundingClientRect();
+    const flagBounds = flag.getBoundingClientRect();
+    const style = getComputedStyle(label);
+    const textFits = lines.length > 0 && lines.every((line) => line.width > 0 &&
+      line.left >= labelBounds.left - 1 && line.right <= labelBounds.right + 1 &&
+      line.top >= bounds.top - 1 && line.bottom <= bounds.bottom + 1);
+    const flagFits = flagBounds.width > 0 && flagBounds.left >= bounds.left &&
+      flagBounds.right <= labelBounds.left + 1 && flagBounds.top >= bounds.top && flagBounds.bottom <= bounds.bottom;
+    const clamp = style.getPropertyValue("-webkit-line-clamp");
+    const noTruncation = style.textOverflow !== "ellipsis" && (clamp === "none" || clamp === "" || clamp === "0");
+    return textFits && flagFits && noTruncation && bounds.height >= 44 && bounds.width >= 44 ? [] :
+      [{ name: label.textContent, reason: JSON.stringify({ textFits, flagFits, noTruncation, width: bounds.width, height: bounds.height }) }];
+  }));
+  expect(failures, "Every full team name and flag must fit its mobile winner button without truncation").toEqual([]);
+}
+
 test("pool filters and views preserve the shared URL and prediction undo session", async ({ page }) => {
   test.setTimeout(60000);
   await page.goto("/");
@@ -80,8 +105,32 @@ test("pool filters and views preserve the shared URL and prediction undo session
         });
     }));
     expect(readable, `Completed standings must keep every code, points value and qualification mark readable at ${width}px`).toBe(true);
+    await expectReadableTeamChoices(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     expect(page.url()).toBe(completedUrl);
+  }
+  await page.getByRole("group", { name: "Pool filter", exact: true }).getByRole("button", { name: "A", exact: true }).click();
+  expect(page.url()).toBe(completedUrl);
+  const hongKongMatch = card(page, 25);
+  const newZealand = hongKongMatch.getByRole("button", { name: "New Zealand", exact: true });
+  const hongKong = hongKongMatch.getByRole("button", { name: "Hong Kong China", exact: true });
+  await newZealand.click(); // Clear the selected pick before checking all three states.
+  for (const winner of [undefined, "New Zealand", "Hong Kong China"]) {
+    if (winner) await hongKongMatch.getByRole("button", { name: winner, exact: true }).click();
+    await expect(newZealand).toHaveAttribute("aria-pressed", String(winner === "New Zealand"));
+    await expect(hongKong).toHaveAttribute("aria-pressed", String(winner === "Hong Kong China"));
+    const stateUrl = page.url();
+    for (const width of [320, 360, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      await expect(hongKongMatch.locator(".team-label > span")).toHaveText(["New Zealand", "Hong Kong China"]);
+      await expectReadableTeamChoices(page);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      expect(page.url()).toBe(stateUrl);
+    }
+    await view(page).getByRole("button", { name: "By pool", exact: true }).click();
+    expect(page.url()).toBe(stateUrl);
+    await view(page).getByRole("button", { name: "Timeline", exact: true }).click();
+    expect(page.url()).toBe(stateUrl);
   }
 });
 

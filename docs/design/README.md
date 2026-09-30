@@ -16,3 +16,5 @@ The implementation preserves the existing domain and scenario controller: offici
 Details changes apply live and group into one undo action per dialog session. Closing retains edits; Clear pick starts a separate action. Suggested values remain distinguishable from explicit values. Knockout opens only after every pool result is valid.
 
 Source Sans 3 and Barlow Condensed are self-hosted with their OFL licences in `src/assets/fonts/`. Flags remain local and icons use inline SVG. The supplied `support.js`, design-system bundle and preview runtime are reference material only; production uses Solid and plain CSS.
+
+Mobile match choices use smaller text/flags and tighter spacing, with full team names wrapping naturally. Preserve 44px touch targets and stable left/right fixture slots when selecting teams.
