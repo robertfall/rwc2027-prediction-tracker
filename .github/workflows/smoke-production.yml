@@ -1,0 +1,31 @@
+name: Smoke production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-production
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: https://rwc2027.myplaceforthings.com
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm install --global npm@12.1.0
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke test production
+        run: npm run test:browser
