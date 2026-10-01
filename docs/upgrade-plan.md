@@ -41,6 +41,14 @@ A Node 24 benchmark of planning all 52 matches, batch validation/reconciliation/
 
 Browser Back/Forward as prediction undo remains an explicit follow-up. Current browser navigation imports the addressed scenario and resets session history; editing replaces the current URL.
 
+### Built-in short sharing
+
+The user approved immutable server-side shared snapshots after modelling reversible word encoding. The local editor and existing v3/legacy contracts remain intact. **Copy link** stores the clicked canonical token in D1, copies a three-word alias and replaces the address bar if that snapshot is still current. A debounced read-only fingerprint lookup also shortens already-shared states; cached aliases restore instantly on undo/redo. Fingerprint and alias uniqueness provide bidirectional lookup and concurrent deduplication; snapshots never overwrite each other. Edits during sharing remain local, and offline/service/clipboard failures retain the full-link/manual-copy fallbacks. [Service and deployment contract](short-links.md), [word-capacity research](word-link-analysis.md)
+
+The Worker has bounded creation/lookup routes and a small reviewed vocabulary; local Workers preview migrates its SQLite-backed D1 automatically. Release applies remote migrations before publishing and needs D1 Edit access in the CI token. Open Graph still uses the branded static image; saved snapshots support a later state-specific renderer. Earlier descriptions below of a stateless Worker and no runtime storage describe the pre-shortener release.
+
+Verification passes both TypeScript compilers, lint, **343 unit/property tests**, production build, Cloudflare dry run and all **37 browser/hosting journeys** against local Workers/D1. Checks include read-only alias discovery, address replacement, refresh, cached undo/navigation, stale responses and conflicting fragment recovery. Native clipboard writing starts during the click with a promised payload to preserve Safari's gesture requirement. The production D1 database and initial schema are provisioned; publishing applies migrations first and verifies the live hostname afterward.
+
 ### Sparse link restoration (before the ranking engine)
 
 The current v3 writer stores only changed fixture records. An immutable profile byte pins tournament, dataset, rules, ranking inputs, completion and team-index order; common winner/advancement choices use a two-bit shortcut. Deeper choices keep field presence, including explicit zero/false and contradictions. Exact default pins reconstruct only under that retained profile; custom resolved outcomes and dormant participant bindings remain explicit. One browser URL writer and all previous readers are retained.

@@ -48,6 +48,12 @@ jobs:
       - run: npm install --global npm@12.1.0
       - run: npm ci
       - run: npm run build
+      - name: Apply shared-link database migrations
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply SHARES --remote
       - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

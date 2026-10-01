@@ -1,5 +1,9 @@
 import { expect, test, type APIResponse } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/shares?fingerprint=*", (route) => route.fulfill({ status: 404, json: { error: "Prediction link not found." } }));
+});
+
 const navigationHeaders = {
   Accept: "text/html",
   "Sec-Fetch-Mode": "navigate",

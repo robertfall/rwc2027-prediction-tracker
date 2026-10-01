@@ -2,13 +2,22 @@ import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { createBrowserController } from "./state/browser";
 import { rankingSnapshot } from "./domain/rankings";
 import { planRankingFill } from "./domain/ranking-fill";
+import { captureShareSnapshot, createShareClient } from "./sharing/client";
+import { beginClipboardWrite } from "./sharing/clipboard";
 import { Icon } from "./components/Icon";
 import { MatchDetailsDialog } from "./components/MatchDetailsDialog";
 import { KnockoutBracket, KnockoutRounds, PoolsByPool, Timeline } from "./components/TournamentViews";
 import "./App.css";
 
 function App() {
-  const browser = createBrowserController();
+  const shareClient = createShareClient();
+  const browser = createBrowserController(undefined, import.meta.env.BASE_URL, {
+    findAlias: async (scenario, signal) => {
+      const snapshot = captureShareSnapshot(scenario, window.location.href, import.meta.env.BASE_URL);
+      const link = await shareClient.findExistingLink(snapshot, signal);
+      return link ? new URL(link.url).pathname.slice("/s/".length) : undefined;
+    },
+  });
   const controller = browser.controller;
   const [state, setState] = createSignal(controller.getState());
   const [urlError, setUrlError] = createSignal(browser.urlError());
@@ -19,6 +28,8 @@ function App() {
   const [activeFixtureId, setActiveFixtureId] = createSignal<number>();
   const [copyStatus, setCopyStatus] = createSignal("");
   const [manualUrl, setManualUrl] = createSignal("");
+  const [sharing, setSharing] = createSignal(false);
+  let disposed = false;
   let detailTrigger: HTMLElement | undefined;
   let loadedTournament = controller.getState().scenario.tournamentId;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -44,7 +55,7 @@ function App() {
     else if (event.key.toLowerCase() === "y") { event.preventDefault(); controller.redo(); }
   };
   document.addEventListener("keydown", keyboard);
-  onCleanup(() => { unsubscribe(); browser.dispose(); document.removeEventListener("keydown", keyboard); if (copyTimer) clearTimeout(copyTimer); });
+  onCleanup(() => { disposed = true; unsubscribe(); browser.dispose(); document.removeEventListener("keydown", keyboard); if (copyTimer) clearTimeout(copyTimer); });
   const tournament = () => state().derived.tournament;
   const fixtures = () => state().derived.fixtures;
   const fixtureById = createMemo(() => new Map(fixtures().map((fixture) => [fixture.id, fixture])));
@@ -58,22 +69,43 @@ function App() {
   const activePhase = () => phase() === "knockout" && !knockoutLocked() ? "knockout" : "pools";
   const knockoutHint = () => "Complete " + (poolFixtures().length - poolCount()) + " remaining pool " + (poolFixtures().length - poolCount() === 1 ? "match" : "matches") + " to unlock the knockout. Resolve any conflicting details first.";
   const copyLink = async () => {
-    const url = window.location.href;
-    let copied: boolean;
-    try { await navigator.clipboard.writeText(url); copied = true; } catch {
-      const previousFocus = document.activeElement as HTMLElement | null;
-      const textarea = document.createElement("textarea");
-      textarea.value = url; textarea.readOnly = true; textarea.tabIndex = -1;
-      textarea.setAttribute("aria-hidden", "true");
-      textarea.style.cssText = "position:fixed;left:0;top:0;opacity:0;pointer-events:none";
-      document.body.append(textarea); textarea.focus({ preventScroll: true }); textarea.select();
-      try { copied = document.execCommand("copy"); } catch { copied = false; }
-      textarea.remove(); previousFocus?.focus({ preventScroll: true });
-    }
-    if (url !== window.location.href) { setCopyStatus("Predictions changed. Copy the link again."); return; }
-    setManualUrl(copied ? "" : url); setCopyStatus(copied ? "Link copied" : "Select the link below to copy it.");
+    if (sharing() || urlError()) return;
+    const snapshot = captureShareSnapshot(controller.getState().scenario, window.location.href, import.meta.env.BASE_URL);
+    setSharing(true); setManualUrl(""); setCopyStatus("");
     if (copyTimer) clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => setCopyStatus(""), 3500);
+    const link = shareClient.getLink(snapshot);
+    const nativeCopy = beginClipboardWrite(link, () => !disposed);
+    try {
+      const { url, shortUnavailable } = await link;
+      if (disposed) return;
+      const path = new URL(url).pathname;
+      if (!shortUnavailable && path.startsWith("/s/")) browser.rememberShortLink(snapshot.token, path.slice("/s/".length));
+      let copied = await nativeCopy;
+      if (disposed) return;
+      if (!copied) {
+        try { await navigator.clipboard.writeText(url); copied = true; } catch {
+          if (disposed) return;
+          const previousFocus = document.activeElement as HTMLElement | null;
+          const textarea = document.createElement("textarea");
+          textarea.value = url; textarea.readOnly = true; textarea.tabIndex = -1;
+          textarea.setAttribute("aria-hidden", "true");
+          textarea.style.cssText = "position:fixed;left:0;top:0;opacity:0;pointer-events:none";
+          try {
+            document.body.append(textarea); textarea.focus({ preventScroll: true }); textarea.select();
+            copied = document.execCommand("copy");
+          } catch { copied = false; }
+          finally { textarea.remove(); previousFocus?.focus({ preventScroll: true }); }
+        }
+      }
+      if (disposed) return;
+      setManualUrl(copied ? "" : url);
+      setCopyStatus(copied ? (shortUnavailable ? "Copied full link; short link unavailable." : "Link copied") :
+        (shortUnavailable ? "Short link unavailable. Select the full link below to copy it." : "Select the link below to copy it."));
+      if (copyTimer) clearTimeout(copyTimer);
+      copyTimer = setTimeout(() => setCopyStatus(""), 3500);
+    } finally {
+      if (!disposed) setSharing(false);
+    }
   };
   return <div class="app-shell">
     <header class="app-header">
@@ -103,7 +135,7 @@ function App() {
             <button type="button" class="icon-button" disabled={Boolean(urlError()) || !state().canRedo} onClick={() => controller.redo()} aria-label="Redo prediction action" title="Redo (Ctrl/⌘ Shift Z)"><Icon name="redo" /></button>
             <button type="button" class="icon-button" disabled={Boolean(urlError()) || !Object.keys(state().scenario.predictions).length} onClick={() => controller.reset()} aria-label="Reset all picks" title="Reset all picks"><Icon name="reset" /></button>
           </div>
-          <button type="button" class="copy-button" disabled={Boolean(urlError())} onClick={() => void copyLink()} aria-label="Copy link"><Icon name="link" /><span>Copy link</span></button>
+          <button type="button" class="copy-button" disabled={Boolean(urlError()) || sharing()} aria-busy={sharing()} onClick={() => void copyLink()} aria-label="Copy link"><Icon name="link" /><span>{sharing() ? "Saving…" : "Copy link"}</span></button>
         </div>
       </div>
       <div class="toolbar-views"><div class="toolbar-views-inner">
@@ -150,7 +182,7 @@ function App() {
         </Show>
       </fieldset>
       <footer class="app-footer">
-        <p>Kickoff times are local to you. Everything happens in your browser. Share your predictions with the link.</p>
+        <p>Kickoff times are local to you. Prediction edits happen in your browser. Share your predictions with a link.</p>
         <details class="rules-details"><summary>{tournament().rulesStatus === "provisional" ? "Provisional 2027 rules & suggested outcomes" : "Tournament rules & sources"}</summary>
           <p>{tournament().rulesNote}</p><p>Unspecified scores and tries use reproducible defaults. Open match details to choose a margin, tries, exact scores or bonus points. These are suggestions, rather than live odds or a calibrated forecast.</p>
           <p>Fill matches uses <a href={rankingSource().source} target="_blank" rel="noopener noreferrer">{rankingSource().label}</a>. Rating-point gaps determine projected margins, scores and tries. Existing choices stay intact; conflicts can leave later matches waiting. You can undo the whole fill at once.</p>

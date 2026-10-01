@@ -5,6 +5,14 @@ const undo = (page: Page) => page.getByRole("button", { name: "Undo last predict
 const redo = (page: Page) => page.getByRole("button", { name: "Redo prediction action" });
 const dialog = (page: Page) => page.getByRole("dialog");
 
+test.beforeEach(async ({ page }) => {
+  // These prediction journeys assert the canonical full-link contract. The
+  // sharing suite exercises discovery of aliases already stored in D1.
+  await page.route(/\/api\/shares\?fingerprint=/, (route) => route.fulfill({
+    status: 404, contentType: "application/json", body: '{"error":"Prediction link not found."}',
+  }));
+});
+
 async function details(page: Page, id: number): Promise<void> {
   await card(page, id).locator(".details-toggle").click();
   await expect(dialog(page)).toBeVisible();
@@ -195,7 +203,7 @@ test("Back and Forward import scenarios without feeding the local undo session",
   await expect(undo(page)).toBeDisabled();
 });
 
-test("mobile details keep focus and layout; copy-link and keyboard undo work", async ({ page, context }) => {
+test("mobile details keep focus and layout; copy-link and keyboard undo work", async ({ page, context, browser, request }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
@@ -209,14 +217,31 @@ test("mobile details keep focus and layout; copy-link and keyboard undo work", a
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await done(page);
+  const predictionUrl = page.url();
   await page.getByRole("button", { name: /^Copy link/ }).click();
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
+  const copiedUrl = await page.evaluate(() => navigator.clipboard.readText());
+  expect(new URL(copiedUrl).origin).toBe(new URL(predictionUrl).origin);
+  expect(new URL(copiedUrl).pathname).toMatch(/^\/s\/[a-z]+\.[a-z]+\.[a-z]+$/);
+  await expect(page).toHaveURL(copiedUrl);
+  const record = await request.get(`/api/shares/${new URL(copiedUrl).pathname.slice("/s/".length)}`);
+  expect((await record.json()).token).toBe(new URL(predictionUrl).hash.slice("#predictions=".length));
+  const fresh = await browser.newContext();
+  const shared = await fresh.newPage();
+  await shared.goto(copiedUrl);
+  await expect(shared).toHaveURL(copiedUrl);
+  await details(shared, 1);
+  await expect(dialog(shared).locator("#match-1-homeScore")).toHaveValue("30");
+  await done(shared);
+  await expect(undo(shared)).toBeDisabled();
+  await fresh.close();
   await page.keyboard.press("Control+z");
+  expect(new URL(page.url()).hash).toMatch(/^#predictions=v3\./);
   await details(page, 1);
   await expect(score).toHaveValue("");
   await page.keyboard.press("Escape");
   await page.keyboard.press("Control+Shift+z");
+  expect(page.url()).toBe(copiedUrl);
   await details(page, 1);
   await expect(score).toHaveValue("30");
 });

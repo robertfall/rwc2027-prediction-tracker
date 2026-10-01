@@ -1,6 +1,8 @@
 # Prediction links
 
-New writes use `#predictions=v3.<base64url>`: a sparse bit-packed token containing only picked/edited fixtures. The browser omits the fragment for an empty default 2027 scenario; an empty legacy 2023 scenario keeps its identity in a six-character token. `src/state/browser.ts` remains the sole URL writer. Loading an older link preserves its address until a prediction action writes the current format.
+Full prediction URLs use `#predictions=v3.<base64url>`: a sparse bit-packed token containing only picked/edited fixtures. The browser omits the fragment for an empty default 2027 scenario; an empty legacy 2023 scenario keeps its identity in a six-character token. `src/state/browser.ts` remains the sole URL writer. Loading an older link preserves its address until a prediction action writes the current format or an exact saved alias is found.
+
+**Copy link** stores the captured canonical token as an immutable public D1 snapshot, copies a short `/s/three.word.alias` URL and replaces the address bar if that snapshot is still current. The service deduplicates identical tokens and redirects aliases into this same fragment reader. A debounced read-only fingerprint lookup reuses already-shared states, with cached aliases restored locally on undo/redo. Schema/profile versions, pinned outcomes and old readers remain unchanged. The full URL is the offline/service-error fallback. [Short-link service](short-links.md)
 
 `src/state/codec.ts` validates scenarios and selects readers. `src/state/compact-codec.ts` defines v3. The in-memory scenario schema remains version 2; transport version 3 changes its representation.
 

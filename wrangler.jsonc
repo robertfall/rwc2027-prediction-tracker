@@ -4,6 +4,21 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-09-30",
   "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "SHARES",
+      "database_name": "rwc2027-shares",
+      "database_id": "825fdcc7-284d-4592-807a-69a54d21ffca",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "SHARE_LIMITER",
+      "namespace_id": "20271001",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
   "routes": [
     { "pattern": "rwc2027.myplaceforthings.com", "custom_domain": true }
   ],

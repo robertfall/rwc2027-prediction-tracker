@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// Keep these layout/history journeys independent of shared production records.
+// Existing-alias discovery and rewriting are exercised in sharing.spec.ts.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/shares?fingerprint=*", (route) => route.fulfill({ status: 404, json: { error: "Prediction link not found." } }));
+});
+
 const card = (page: Page, id: number) => page.locator('[data-fixture-id="' + id + '"]');
 const undo = (page: Page) => page.getByRole("button", { name: "Undo last prediction action" });
 const redo = (page: Page) => page.getByRole("button", { name: "Redo prediction action" });

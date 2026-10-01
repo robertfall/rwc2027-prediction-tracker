@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/shares?fingerprint=*", (route) => route.fulfill({ status: 404, json: { error: "Prediction link not found." } }));
+});
+
 const card = (page: Page, id: number) => page.locator(`[data-fixture-id="${id}"]`);
 const fill = (page: Page) => page.getByRole("button", { name: "Fill unpicked matches", exact: true });
 const undo = (page: Page) => page.getByRole("button", { name: "Undo last prediction action" });
@@ -19,14 +23,15 @@ test("rankings fill the entire tournament offline with one URL write and one und
       replace(...args);
     };
   });
-  // Production Cloudflare can inject its own SPA analytics. It is unrelated
-  // to predictions; every other application fetch/XHR remains forbidden.
+  // Production analytics and optional read-only alias discovery do not gate
+  // prediction work. No editing request may create or change server state.
   const cloudflareBeacon = await page.locator('script[src^="https://static.cloudflareinsights.com/beacon.min.js"]').count() > 0;
   const editRequests: string[] = [];
   page.on("request", (request) => {
     if (!["fetch", "xhr"].includes(request.resourceType())) return;
     const url = new URL(request.url());
     if (cloudflareBeacon && url.origin === new URL(page.url()).origin && url.pathname === "/cdn-cgi/rum") return;
+    if (request.method() === "GET" && url.origin === new URL(page.url()).origin && url.pathname === "/api/shares" && url.searchParams.has("fingerprint")) return;
     editRequests.push(request.url());
   });
   await context.setOffline(true);
