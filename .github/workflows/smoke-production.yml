@@ -5,6 +5,7 @@ on:
   # Verify this workflow after it changes; ordinary app pushes deploy via Check.
   push:
     branches: [main]
+    tags: ["production-smoke/**"]
     paths: [.github/workflows/smoke-production.yml]
 
 permissions:

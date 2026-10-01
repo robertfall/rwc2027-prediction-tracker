@@ -56,7 +56,7 @@ BASE_URL=https://rwc2027.myplaceforthings.com npm run test:browser
 
 `wrangler.jsonc` deploys `dist/` with a small stateless routing Worker. Root and common static assets bypass the Worker. Document requests at legacy prediction paths are internally served the app shell without a redirect: Cloudflare's asset service otherwise normalizes repeated slashes and corrupts ordinary-Base64 links. Current fragment links keep predictions entirely in the browser. The routing Worker retains no predictions.
 
-`public/_headers` gives content-hashed `/assets/*` files one-year immutable caching. HTML and unversioned flags use Cloudflare's revalidation policy; missing assets return 404. The tests exercise the actual Workers runtime and can target the deployed hostname using `BASE_URL`.
+`public/_headers` gives content-hashed `/assets/*` files one-year immutable caching. HTML, flags and social preview images use Cloudflare's revalidation policy; missing assets return 404. Open Graph/Twitter tags are present in the HTML without JavaScript, using the static `/social/rwc2027-card-v1.png` image. URL fragments stay in the browser, so shared predictions use the same app preview. The tests exercise the actual Workers runtime and can target the deployed hostname using `BASE_URL`.
 
 `npm run preview` still serves the last build through Vite. Generic static hosting/subdirectory builds remain possible with `npm run build -- --base=/your-path/`; the configured Cloudflare deployment serves this dedicated hostname at its root.
 

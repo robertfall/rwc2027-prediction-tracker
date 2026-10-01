@@ -18,3 +18,5 @@ Details changes apply live and group into one undo action per dialog session. Cl
 Source Sans 3 and Barlow Condensed are self-hosted with their OFL licences in `src/assets/fonts/`. Flags remain local and icons use inline SVG. The supplied `support.js`, design-system bundle and preview runtime are reference material only; production uses Solid and plain CSS.
 
 Mobile match choices use smaller text/flags and tighter spacing, with full team names wrapping naturally. Preserve 44px touch targets and stable left/right fixture slots when selecting teams.
+
+The link-sharing card is `public/social/rwc2027-card-v1.png` (1200×630). Regenerate it with `node scripts/generate-social-card.mjs` using ImageMagick 7 and the supplied fonts; this tool is separate from the app/build. Its abstract bracket contains no actual predictions. Use a new image filename and update the metadata when replacing a published card, so sharing services can fetch a fresh image.

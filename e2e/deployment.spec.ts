@@ -15,6 +15,79 @@ function expectRevalidation(response: APIResponse): void {
   expect(cache).not.toMatch(/(?:^|,)\s*immutable(?:\s*,|$)/);
 }
 
+test("social crawlers receive complete metadata and the large PNG preview without JavaScript or redirects", async ({ request, baseURL }) => {
+  const title = "RWC 2027 Predictor";
+  const description = "Pick your winners. Shape the tournament. Share your predictions.";
+  const siteUrl = "https://rwc2027.myplaceforthings.com/";
+  const imageUrl = `${siteUrl}social/rwc2027-card-v1.png`;
+  const imageAlt = "RWC 2027 Predictor: pick your winners, shape the tournament and share your predictions.";
+  const crawlerHeaders = { Accept: "text/html", "User-Agent": "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)" };
+  const expectedMetadata = {
+    description,
+    "og:title": title,
+    "og:description": description,
+    "og:type": "website",
+    "og:site_name": title,
+    "og:url": siteUrl,
+    "og:image": imageUrl,
+    "og:image:secure_url": imageUrl,
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:type": "image/png",
+    "og:image:alt": imageAlt,
+    "twitter:card": "summary_large_image",
+    "twitter:title": title,
+    "twitter:description": description,
+    "twitter:image": imageUrl,
+    "twitter:image:alt": imageAlt,
+  };
+  for (const path of ["/", legacyPath]) {
+    for (const method of ["GET", "HEAD"]) {
+      const response = await request.fetch(path, { method, headers: crawlerHeaders, maxRedirects: 0 });
+      expect(response.status()).toBe(200);
+      expect(response.url()).toBe(new URL(path, baseURL).href);
+      expect(response.headers().location).toBeUndefined();
+      expect(response.headers()["content-type"]).toMatch(/^text\/html(?:;|$)/);
+      expectRevalidation(response);
+      if (method === "HEAD") {
+        expect(await response.body()).toHaveLength(0);
+        continue;
+      }
+      const html = await response.text();
+      const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
+      expect(head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]).toBe(title);
+      const metadata = new Map<string, string[]>();
+      for (const tag of head.matchAll(/<meta\b[^>]*>/gi)) {
+        const attributes = new Map(Array.from(tag[0].matchAll(/\b(name|property|content)\s*=\s*(["'])(.*?)\2/gi),
+          (match) => [match[1].toLowerCase(), match[3]]));
+        const key = attributes.get("property") ?? attributes.get("name");
+        const value = attributes.get("content");
+        if (key && value !== undefined) metadata.set(key, [...(metadata.get(key) ?? []), value]);
+      }
+      for (const [name, value] of Object.entries(expectedMetadata)) expect(metadata.get(name), name).toEqual([value]);
+    }
+  }
+  // Fetch the advertised path on the target runtime. Its metadata keeps the
+  // canonical absolute production URL even during local hosting verification.
+  const imagePath = new URL(imageUrl).pathname;
+  for (const method of ["GET", "HEAD"]) {
+    const response = await request.fetch(imagePath, { method, headers: crawlerHeaders, maxRedirects: 0 });
+    expect(response.status()).toBe(200);
+    expect(response.url()).toBe(new URL(imagePath, baseURL).href);
+    expect(response.headers().location).toBeUndefined();
+    expect(response.headers()["content-type"]).toMatch(/^image\/png(?:;|$)/);
+    expectRevalidation(response);
+    const body = await response.body();
+    if (method === "HEAD") expect(body).toHaveLength(0);
+    else {
+      expect(body.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      expect(body.subarray(12, 16).toString("ascii")).toBe("IHDR");
+      expect(body.readUInt32BE(16)).toBe(1200);
+      expect(body.readUInt32BE(20)).toBe(630);
+    }
+  }
+});
+
 for (const [path, tournament, poolCount] of [
   ["/?deployment=root", "2027", 36],
   ["/index.html?deployment=index", "2027", 36],

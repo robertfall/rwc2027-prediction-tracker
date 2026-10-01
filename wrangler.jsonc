@@ -17,6 +17,7 @@
       "!/",
       "!/assets/*",
       "!/flags/*",
+      "!/social/*",
       "!/rwc2027.svg"
     ]
   }

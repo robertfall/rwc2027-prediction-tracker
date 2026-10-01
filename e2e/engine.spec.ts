@@ -19,9 +19,15 @@ test("rankings fill the entire tournament offline with one URL write and one und
       replace(...args);
     };
   });
+  // Production Cloudflare can inject its own SPA analytics. It is unrelated
+  // to predictions; every other application fetch/XHR remains forbidden.
+  const cloudflareBeacon = await page.locator('script[src^="https://static.cloudflareinsights.com/beacon.min.js"]').count() > 0;
   const editRequests: string[] = [];
   page.on("request", (request) => {
-    if (["fetch", "xhr"].includes(request.resourceType())) editRequests.push(request.url());
+    if (!["fetch", "xhr"].includes(request.resourceType())) return;
+    const url = new URL(request.url());
+    if (cloudflareBeacon && url.origin === new URL(page.url()).origin && url.pathname === "/cdn-cgi/rum") return;
+    editRequests.push(request.url());
   });
   await context.setOffline(true);
   await fill(page).click();
