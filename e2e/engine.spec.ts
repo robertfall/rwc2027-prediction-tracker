@@ -45,12 +45,12 @@ test("rankings fill the entire tournament offline with one URL write and one und
   await redo(page).click();
   expect(page.url()).toBe(savedUrl);
   await knockout(page).click();
-  await expect(card(page, 52)).toHaveText(final);
+  await expect(card(page, 52)).toHaveText(final, { useInnerText: true });
   await context.setOffline(false);
   const shared = await browser.newPage();
   await shared.goto(savedUrl);
   await knockout(shared).click();
-  await expect(card(shared, 52)).toHaveText(final);
+  await expect(card(shared, 52)).toHaveText(final, { useInnerText: true });
   await expect(fill(shared)).toBeDisabled();
   await expect(undo(shared)).toBeDisabled();
   await shared.close();
@@ -69,11 +69,11 @@ test("fill preserves an upset and detailed choices, then one undo restores only 
   const priorResult = await card(page, 1).locator(".result-preview").innerText();
   await fill(page).click();
   await expect(card(page, 1).getByRole("button", { name: "Hong Kong China", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(card(page, 1).locator(".result-preview")).toHaveText(priorResult);
+  await expect(card(page, 1).locator(".result-preview")).toHaveText(priorResult, { useInnerText: true });
   await expect(knockout(page)).toContainText("16/16");
   await undo(page).click();
   expect(page.url()).toBe(priorUrl);
-  await expect(card(page, 1).locator(".result-preview")).toHaveText(priorResult);
+  await expect(card(page, 1).locator(".result-preview")).toHaveText(priorResult, { useInnerText: true });
   await expect(page.locator(".fixture-card .result-preview strong")).toHaveCount(1);
 });
 
