@@ -28,6 +28,9 @@
 .copy-button:disabled { background: var(--color-muted); border-color: var(--color-muted); }
 .toolbar-views { border-top: 1px solid var(--color-border-subtle); background: white; }
 .toolbar-views-inner { display: flex; flex-wrap: wrap; align-items: end; gap: 6px 12px; padding-block: 6px; }
+.fill-button { margin-left: auto; flex: none; min-height: 36px; padding: 0 12px; border: 1px solid var(--color-eucalyptus); border-radius: 8px; background: white; color: var(--color-eucalyptus); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.fill-button:hover:not(:disabled) { background: var(--color-paper); }
+.fill-button:disabled { color: var(--color-muted); border-color: var(--color-border-subtle); }
 .segmented { display: flex; border: 1px solid var(--color-border-strong); border-radius: 8px; background: white; }
 .segmented button { display: inline-flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 34px; padding: 0 10px; border: 0; background: white; font-size: 14px; font-weight: 600; white-space: nowrap; }
 .segmented button + button { border-left: 1px solid var(--color-border-subtle); }
@@ -265,7 +268,11 @@
   .view-nav button { gap: 6px; }
   .stage-tooltip { left: auto; right: 0; width: min(250px, 80vw); }
   .toolbar-views-inner { gap: 8px; padding-block: 8px; }
-  .view-options, .pool-filter { max-width: none; flex: 1 1 100%; }
+  .view-options { max-width: none; flex: 1 1 150px; }
+  .view-options.segmented button { padding-inline: 6px; font-size: 13px; min-height: 44px; }
+  .view-options svg { display: none; }
+  .pool-filter { order: 3; max-width: none; flex: 1 1 100%; }
+  .fill-button { min-height: 44px; padding-inline: 8px; font-size: 13px; }
   .segmented button { min-height: 36px; }
   .pool-filter .segmented button { padding-inline: 6px; min-height: 40px; }
   .app-main { padding-top: 12px; }

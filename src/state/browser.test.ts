@@ -120,6 +120,33 @@ describe("Browser URL and history ownership", () => {
     expect(web.writes).toHaveLength(1);
   });
 
+  it("shares ranking fill with one URL write and replays its profile, pins and atomic undo", () => {
+    const web = adapter(`/?from=friend#predictions=${originalV2}`);
+    const app = createBrowserController(web.web, "/");
+    const before = app.controller.getState().scenario;
+    expect(before.completionVersion).toBe("defaults-v1");
+    app.controller.fillFromRankings();
+    expect(web.writes).toHaveLength(1);
+    const filled = app.controller.getState().scenario;
+    const url = web.url();
+    expect(filled.completionVersion).toBe("rankings-v1");
+    expect(Object.keys(filled.resolved!)).toHaveLength(52);
+    expect(filled.resolved![1]).toEqual(before.resolved![1]);
+    expect(url).toContain("/?from=friend#predictions=v3.");
+    const fresh = createBrowserController(adapter(url).web, "/");
+    expect(fresh.controller.getState().scenario).toEqual(filled);
+    expect(fresh.controller.getState().canUndo).toBe(false);
+    app.controller.fillFromRankings();
+    expect(web.writes).toHaveLength(1);
+    app.controller.undo();
+    expect(web.writes).toHaveLength(2);
+    expect(app.controller.getState().scenario).toEqual(before);
+    expect(web.url()).toBe("/?from=friend#predictions=v3.AYIKQA");
+    app.controller.redo();
+    expect(web.writes).toHaveLength(3);
+    expect(web.url()).toBe(url);
+  });
+
   it.each(["/broken", "/%E0%A4%A", "/#predictions=invalid", "/#other", "/#predictions=v3.rwc2027.anything.AAAA"])("preserves invalid addresses until explicit recovery (%s)", (url) => {
     const web = adapter(url);
     const app = createBrowserController(web.web, "/");

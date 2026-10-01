@@ -1,5 +1,6 @@
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { createBrowserController } from "./state/browser";
+import { rankingSnapshot } from "./domain/rankings";
 import { Icon } from "./components/Icon";
 import { MatchDetailsDialog } from "./components/MatchDetailsDialog";
 import { KnockoutBracket, KnockoutRounds, PoolsByPool, Timeline } from "./components/TournamentViews";
@@ -51,6 +52,8 @@ function App() {
   const knockoutTotal = () => fixtures().length - poolFixtures().length;
   const knockoutCount = () => fixtures().filter((fixture) => fixture.stage !== "pool" && fixture.result && !fixture.issues.length).length;
   const knockoutLocked = () => !state().derived.poolsComplete;
+  const canFill = () => fixtures().some((fixture) => !fixture.prediction && fixture.homeTeam && fixture.awayTeam);
+  const rankingSource = () => rankingSnapshot(tournament().id);
   const activePhase = () => phase() === "knockout" && !knockoutLocked() ? "knockout" : "pools";
   const knockoutHint = () => "Complete " + (poolFixtures().length - poolCount()) + " remaining pool " + (poolFixtures().length - poolCount() === 1 ? "match" : "matches") + " to unlock the knockout. Resolve any conflicting details first.";
   const copyLink = async () => {
@@ -116,6 +119,9 @@ function App() {
         <Show when={activePhase() === "pools"}><div class="pool-filter"><span class="control-caption">Pool</span><div class="segmented" role="group" aria-label="Pool filter">
           <For each={["all", ...tournament().pools.map((pool) => pool.id)]}>{(pool) => <button type="button" aria-pressed={poolFilter() === pool} onClick={() => setPoolFilter(pool)}>{pool === "all" ? "All" : pool}</button>}</For>
         </div></div></Show>
+        <button type="button" class="fill-button" disabled={Boolean(urlError()) || !canFill()}
+          aria-label="Fill unpicked matches" title={`Fill all unpicked matches using World Rugby rankings (${rankingSource().effectiveDate}). Keeps your existing picks; undo in one action.`}
+          onClick={() => controller.fillFromRankings()}>Fill matches</button>
       </div></div>
     </header>
     <main class="app-main">
@@ -140,6 +146,7 @@ function App() {
         <p>Kickoff times are local to you. Everything happens in your browser. Share your predictions with the link.</p>
         <details class="rules-details"><summary>{tournament().rulesStatus === "provisional" ? "Provisional 2027 rules & suggested outcomes" : "Tournament rules & sources"}</summary>
           <p>{tournament().rulesNote}</p><p>Unspecified scores and tries use reproducible defaults. Open match details to choose a margin, tries, exact scores or bonus points. These are suggestions, rather than live odds or a calibrated forecast.</p>
+          <p>Fill matches uses <a href={rankingSource().source} target="_blank" rel="noopener noreferrer">{rankingSource().label}</a>. Rating-point gaps determine projected margins, scores and tries. Existing choices stay intact; conflicts can leave later matches waiting. You can undo the whole fill at once.</p>
           <ul><For each={tournament().sources}>{(source) => <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>}</For></ul><p>{tournament().rankingsLabel}</p>
         </details>
         <p>An independent project. Not affiliated with or endorsed by World Rugby or Rugby World Cup Limited.</p>

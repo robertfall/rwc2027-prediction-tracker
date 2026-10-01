@@ -1,4 +1,5 @@
-import type { CompletedResult, Completion, Fixture, PredictionIntent, Side, Team, Tournament, Winner } from "./types";
+import { rankingProjection } from "./rankings";
+import type { CompletedResult, Completion, CompletionVersion, Fixture, PredictionIntent, Side, Team, Tournament, Winner } from "./types";
 
 export const intentFields = [
   "winner", "advancing", "margin", "homeScore", "awayScore", "homeTries", "awayTries",
@@ -45,17 +46,25 @@ export function completePrediction(
   tournament: Tournament,
   homeTeam?: Team,
   awayTeam?: Team,
+  completionVersion: CompletionVersion = "defaults-v1",
 ): Completion {
   validateIntent(intent);
+  if (completionVersion !== "defaults-v1" && completionVersion !== "rankings-v1") {
+    throw new RangeError("This prediction uses an unsupported completion version.");
+  }
   if (Object.keys(intent).length === 0) return { issues: [] };
   if (!homeTeam || !awayTeam) return { issues: ["Choose the earlier results to resolve these teams."] };
   const knockout = fixture.stage !== "pool";
-  const defaultSide: Side = (tournament.rankings[awayTeam.id] ?? Infinity) < (tournament.rankings[homeTeam.id] ?? Infinity) ? "away" : "home";
+  const ranked = completionVersion === "rankings-v1" ? rankingProjection(tournament, homeTeam, awayTeam) : undefined;
+  const defaultSide: Side = ranked ? ranked.winner === "away" ? "away" : "home"
+    : (tournament.rankings[awayTeam.id] ?? Infinity) < (tournament.rankings[homeTeam.id] ?? Infinity) ? "away" : "home";
   const preferred = intent.winner ?? (intent.margin === 0 ? "draw" :
     intent.homeLosingBonus === true ? "away" : intent.awayLosingBonus === true ? "home" :
       intent.advancing ?? defaultSide);
-  const desiredHome = preferred === "draw" ? 21 : preferred === "home" ? 24 : 17;
-  const desiredAway = preferred === "draw" ? 21 : preferred === "away" ? 24 : 17;
+  const suggestedWinnerScore = ranked ? Math.max(ranked.homeScore, ranked.awayScore) : 24;
+  const suggestedLoserScore = ranked ? Math.min(ranked.homeScore, ranked.awayScore) : 17;
+  const desiredHome = preferred === "draw" ? 21 : preferred === "home" ? suggestedWinnerScore : suggestedLoserScore;
+  const desiredAway = preferred === "draw" ? 21 : preferred === "away" ? suggestedWinnerScore : suggestedLoserScore;
   const minimumHome = Math.max(5 * (intent.homeTries ?? 0), intent.homeTryBonus === true ? 20 : 0);
   const minimumAway = Math.max(5 * (intent.awayTries ?? 0), intent.awayTryBonus === true ? 20 : 0);
 

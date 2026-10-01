@@ -5,13 +5,14 @@
 - Keep every prediction edit, recalculation and undo instant and local. The app is statically hosted: no backend prediction state, accounts or network-dependent editing.
 - Sharing means copying the URL. A fresh browser must reproduce the same tournament, choices and outcomes without local storage.
 - Let users stay shallow or go deep: pick a winner or pool draw, then optionally edit margin, scores, tries and bonuses. Open Details on request and distinguish suggested values from explicit choices.
+- Fill matches projects every eligible unpicked match from world rankings, including the bracket, as one undoable action. Preserve existing choices and conflicts.
 - Keep one compact sticky toolbar and dense match views. Matches are the main column; standings sit to the right on desktop and stack on mobile (above matches in By pool). Use the [supplied design](docs/design/README.md); keep explanations in tooltips or the footer.
 - Explicit choices take precedence. Preserve contradictory intent, show the conflict, and exclude conflicting results from standings and qualification.
 - Make meaningful changes reversible, including reset and downstream bracket consequences. Preserve focus, keyboard access and mobile usability; wrap full match-team names without truncation and keep team choices at least 44px tall. Measure before adding dependencies or rendering work.
 
 ## Repository map
 
-- `src/domain/`: plain TypeScript tournament definitions, deterministic completion, standings, qualification and bracket derivation. `types.ts` defines the shared contracts; `tournaments.ts` selects 2027 or legacy 2023.
+- `src/domain/`: plain TypeScript tournament definitions, deterministic completion, standings, qualification and bracket derivation. `rankings.ts`/`ranking-data.ts` provide the first-pass engine and immutable rating snapshots; `types.ts` defines shared contracts and `tournaments.ts` selects 2027 or legacy 2023.
 - `src/state/controller.ts`: immutable scenario snapshots, atomic actions, grouped field edits and undo/redo. `codec.ts` validates/dispatches link versions; `compact-codec.ts` writes sparse v3 bits with immutable profiles; `browser.ts` alone reads/writes prediction URLs.
 - `src/App.tsx` and `src/components/`: Solid pool/timeline/rounds/bracket views, standings and the shared Details dialog, with plain CSS. `main.tsx` mounts the app. Keep domain calculations independent of Solid.
 - `src/services/results/{compression,model}.ts` and `src/data/`: retained 2023 compatibility. Pure legacy scoring tests remain under `src/services/logs/`.
@@ -23,6 +24,7 @@
 - Untouched fixtures stay unpicked. `Prediction.intent` stores explicit constraints; `Scenario.resolved` pins valid completed outcomes. Suggestions are reproducible defaults, not calibrated odds.
 - Validate all numeric/URL inputs. Scores and margin are integers 0–255; tries 0–15. Missing values mean inferred, never zero. A drawn knockout requires a separate advancing team.
 - Version schema, tournament, dataset, rules and completion. Retain old definitions/readers when introducing new versions; never map 2023 match IDs onto 2027. Never silently recompute a shared scenario with new defaults.
+- Fresh scenarios use `rankings-v1`: rating-point gaps seed scores; explicit constraints still win. Keep engine snapshots separate from qualification tie-break rankings. Retain `defaults-v1` and v3 profiles 1–4 permanently; new ranking data/formulas require a new completion version/profile. [Engine contract](docs/prediction-engine.md)
 - Keep [links tiny and sparse](docs/prediction-links.md). Retain v3 profiles/team-index order and all v2/v1/legacy readers, with golden version examples and strict 9/11/73/129-character representative token budgets. Encode default pins only on exact equality; preserve absent, zero, false, conflicts and custom outcomes.
 - Gate Knockout until every pool fixture has a valid completed result. Qualification markers use the same derived state, including best thirds; bracket connectors follow fixture sources, never match-number adjacency.
 - Bind knockout choices to participants. Clear incompatible picks when known teams change, as part of the same undo action; retain dormant picks while earlier results are temporarily unresolved.

@@ -6,7 +6,9 @@ Browse pools by pool or timeline, then unlock knockout rounds, timeline and brac
 
 Shared links use sparse v3 bit-packing: one winner takes a nine-character token and 52 winner/advancement choices take 129; older links remain readable. [Prediction-link format](docs/prediction-links.md)
 
-Unspecified details use deterministic suggestions. Live odds and the calibrated forecasting engine are follow-ups. The official 52-match schedule is included; final 2027 tie regulations and the future ranking snapshot remain provisional. [Sources and assumptions](docs/tournament-sources.md)
+**Fill matches** predicts every unpicked pool and knockout match from World Rugby rankings, preserving your choices and undoing as one action. Fresh winner picks also use ranking-gap scores and inferred tries/bonuses. This first-pass heuristic uses fixed rating snapshots; live odds and calibration are follow-ups. [Prediction engine](docs/prediction-engine.md)
+
+The official 52-match schedule is included; final 2027 tie regulations and the future qualification tie-break ranking snapshot remain provisional. [Sources and assumptions](docs/tournament-sources.md)
 
 ## Development
 

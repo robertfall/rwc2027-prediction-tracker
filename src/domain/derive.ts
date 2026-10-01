@@ -9,6 +9,9 @@ export function deriveScenario(scenario: Scenario): DerivedScenario {
   if (scenario.datasetVersion !== tournament.datasetVersion || scenario.rulesVersion !== tournament.rulesVersion) {
     throw new Error("This scenario uses an unsupported tournament dataset or rules version.");
   }
+  if (scenario.completionVersion !== "defaults-v1" && scenario.completionVersion !== "rankings-v1") {
+    throw new Error("This scenario uses an unsupported completion version.");
+  }
   const teams = new Map(tournament.teams.map((team) => [team.id, team]));
   const resolved = new Map<number, ResolvedFixture>();
   function complete(fixture: Fixture, homeTeam?: Team, awayTeam?: Team): ResolvedFixture {
@@ -19,7 +22,7 @@ export function deriveScenario(scenario: Scenario): DerivedScenario {
       item.issues = ["The teams in this fixture changed. Choose an outcome for the new matchup."];
       return item;
     }
-    const completion = completePrediction(prediction.intent, fixture, tournament, homeTeam, awayTeam);
+    const completion = completePrediction(prediction.intent, fixture, tournament, homeTeam, awayTeam, scenario.completionVersion);
     item.result = completion.result ? (scenario.resolved?.[fixture.id] ?? completion.result) : undefined;
     item.issues = item.result
       ? completionIssues(prediction.intent, fixture, item.result, homeTeam, awayTeam)

@@ -296,8 +296,8 @@ test("opening details keeps a match unpicked; an explicit zero and Clear pick ar
   await dialog(page).getByRole("group", { name: "Winner, match 1", exact: true }).getByRole("button", { name: "Australia", exact: true }).click();
   await expect(dialog(page).locator(".fixture-issues")).toHaveCount(0);
   await expect(margin).toHaveValue("");
-  await expect(margin).toHaveAttribute("placeholder", "7");
-  await expect(quickMargin.locator(".detail-label small")).toHaveText("Suggested 7");
+  await expect(margin).toHaveAttribute("placeholder", "50");
+  await expect(quickMargin.locator(".detail-label small")).toHaveText("Suggested 50");
   await done(page);
   expect(page.url()).toBe(winnerUrl);
   await card(page, 1).getByRole("button", { name: "Australia", exact: true }).click();

@@ -3,7 +3,7 @@ import fc from "fast-check";
 import { deflateSync, strToU8 } from "fflate";
 import { decodeScenario, encodeScenario, validateScenario } from "./codec";
 import { createScenarioController, emptyScenario } from "./controller";
-import type { PredictionIntent, Scenario } from "../domain/types";
+import type { CompletionVersion, PredictionIntent, Scenario } from "../domain/types";
 import { intentFields } from "../domain/completion";
 
 const originalV2 = "v2.rwc2027.fixtures-2026-02.AE4ARItWKijKL8sszszPS8zRLTNU0lFKSU1LLM0pKQbzoqMNdQx1opUy8nNTlWJ18kpzcnSijUx0DM11jHWMdCDiYOFYIAAA";
@@ -41,8 +41,8 @@ const intent = fc.record({
   return (Object.keys(present).length ? present : { winner: "home" }) as PredictionIntent;
 });
 
-export function fullScenario(): Scenario {
-  const controller = createScenarioController();
+export function fullScenario(completionVersion: CompletionVersion = "rankings-v1"): Scenario {
+  const controller = createScenarioController(emptyScenario("rwc2027", completionVersion));
   for (const fixture of controller.getState().derived.fixtures.filter((entry) => entry.stage === "pool")) controller.update(fixture.id, { winner: "home" });
   for (const fixture of controller.getState().derived.fixtures.filter((entry) => entry.stage !== "pool")) controller.update(fixture.id, { advancing: "home" });
   return controller.getState().scenario;
@@ -50,9 +50,9 @@ export function fullScenario(): Scenario {
 
 describe("Scenario URL replay", () => {
   it("keeps empty and winner-only links sparse and fixes their versioned default outcomes", () => {
-    expect(encodeScenario(emptyScenario())).toBe("v3.AYA");
-    expect(encodeScenario(emptyScenario("rwc2023"))).toBe("v3.AoA");
-    const controller = createScenarioController();
+    expect(encodeScenario(emptyScenario("rwc2027", "defaults-v1"))).toBe("v3.AYA");
+    expect(encodeScenario(emptyScenario("rwc2023", "defaults-v1"))).toBe("v3.AoA");
+    const controller = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
     controller.update(1, { winner: "home" });
     expect(encodeScenario(controller.getState().scenario)).toBe("v3.AYIKQA");
     const decoded = decodeScenario("v3.AYIKQA");
@@ -62,9 +62,39 @@ describe("Scenario URL replay", () => {
     expect(decodeScenario("v3.AYIKQA").resolved![1].homeScore).toBe(24);
     controller.update(1, { margin: 15, homeTryBonus: true });
     expect(encodeScenario(controller.getState().scenario).length).toBeLessThanOrEqual(11);
+    const pools = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
+    for (let id = 1; id <= 36; id++) pools.update(id, { winner: "home" });
+    expect(encodeScenario(pools.getState().scenario).length).toBeLessThanOrEqual(73);
+  });
+
+  it("gives ranking suggestions their own immutable profiles without growing sparse links", () => {
+    expect(encodeScenario(emptyScenario())).toBe("v3.A4A");
+    expect(encodeScenario(emptyScenario("rwc2023"))).toBe("v3.BIA");
+    const controller = createScenarioController();
+    controller.update(1, { winner: "home" });
+    const token = encodeScenario(controller.getState().scenario);
+    expect(token).toBe("v3.A4IKQA");
+    expect(token.length).toBeLessThanOrEqual(9);
+    const decoded = decodeScenario(token);
+    expect(decoded.completionVersion).toBe("rankings-v1");
+    expect(decoded.resolved![1]).toEqual({ homeScore: 58, awayScore: 8, homeTries: 8, awayTries: 1, winner: "home" });
+    expect(decodeScenario("v3.AYIKQA").resolved![1].homeScore).toBe(24);
+    controller.update(1, { margin: 15, homeTryBonus: true });
+    expect(encodeScenario(controller.getState().scenario).length).toBeLessThanOrEqual(11);
     const pools = createScenarioController();
     for (let id = 1; id <= 36; id++) pools.update(id, { winner: "home" });
     expect(encodeScenario(pools.getState().scenario).length).toBeLessThanOrEqual(73);
+    const ranked = createScenarioController();
+    ranked.fillFromRankings();
+    expect(encodeScenario(ranked.getState().scenario).length).toBeLessThanOrEqual(129);
+    expect(decodeScenario(encodeScenario(ranked.getState().scenario))).toEqual(ranked.getState().scenario);
+    const legacy = createScenarioController(emptyScenario("rwc2023"));
+    legacy.update(1, { winner: "home" });
+    expect(encodeScenario(legacy.getState().scenario)).toBe("v3.BIIKQA");
+    expect(decodeScenario("v3.BIIKQA")).toEqual(legacy.getState().scenario);
+    legacy.fillFromRankings();
+    expect(decodeScenario(encodeScenario(legacy.getState().scenario))).toEqual(legacy.getState().scenario);
+    expect(Object.keys(legacy.getState().scenario.resolved!)).toHaveLength(48);
   });
 
   it("preserves absent versus empty saved outcomes and every explicit zero/false or maximum field", () => {
@@ -97,8 +127,8 @@ describe("Scenario URL replay", () => {
     }));
   });
 
-  it("shares a completed 52-match scenario compactly, including replayed outcomes and participants", () => {
-    const scenario = fullScenario();
+  it.each(["defaults-v1", "rankings-v1"] as const)("shares a completed 52-match %s scenario compactly, including replayed outcomes and participants", (version) => {
+    const scenario = fullScenario(version);
     expect(Object.keys(scenario.predictions)).toHaveLength(52);
     expect(Object.keys(scenario.resolved!)).toHaveLength(52);
     const payload = encodeScenario(scenario);

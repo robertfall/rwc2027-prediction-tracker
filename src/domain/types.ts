@@ -1,6 +1,7 @@
 export type Side = "home" | "away";
 export type Winner = Side | "draw";
 export type Stage = "pool" | "round16" | "quarter" | "semi" | "bronze" | "final";
+export type CompletionVersion = "defaults-v1" | "rankings-v1";
 
 export interface Team {
   id: string;
@@ -78,7 +79,7 @@ export interface Scenario {
   tournamentId: Tournament["id"];
   datasetVersion: string;
   rulesVersion: string;
-  completionVersion: "defaults-v1";
+  completionVersion: CompletionVersion;
   predictions: Record<number, Prediction>;
   resolved?: Record<number, CompletedResult>;
 }
