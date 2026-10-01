@@ -4,9 +4,9 @@ A lightweight, browser-only predictor for the 2027 Rugby World Cup. Pick winners
 
 Browse pools by pool or timeline, then unlock knockout rounds, timeline and bracket views once every pool result is valid. Standings sit beside matches on desktop and stack on mobile. View and filter changes leave predictions and the URL untouched. Details edits apply immediately as one undoable session; **Clear pick** is a separate action. [Design reference](docs/design/README.md)
 
-Shared links use sparse v3 bit-packing: one winner takes a nine-character token and 52 winner/advancement choices take 129; older links remain readable. [Prediction-link format](docs/prediction-links.md)
+Shared links use sparse v3 bit-packing: one shallow winner takes a nine-character token and 52 winner/advancement choices take 129; older links remain readable. Generated scores and tries use the existing saved-outcome encoding. [Prediction-link format](docs/prediction-links.md)
 
-**Fill matches** predicts every unpicked pool and knockout match from World Rugby rankings, preserving your choices and undoing as one action. Fresh winner picks also use ranking-gap scores and inferred tries/bonuses. This first-pass heuristic uses fixed rating snapshots; live odds and calibration are follow-ups. [Prediction engine](docs/prediction-engine.md)
+**Fill matches** projects every eligible unpicked pool and knockout match from World Rugby ratings. It plans outcomes separately, then applies one batch: one undo action and one URL update, preserving existing choices. Manual winner picks retain 24–17 completion. Fixed snapshots and a simple rating-gap heuristic provide the first pass; live odds and calibration are follow-ups. [Prediction engine](docs/prediction-engine.md)
 
 The official 52-match schedule is included; final 2027 tie regulations and the future qualification tie-break ranking snapshot remain provisional. [Sources and assumptions](docs/tournament-sources.md)
 

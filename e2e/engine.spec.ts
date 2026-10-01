@@ -28,7 +28,10 @@ test("rankings fill the entire tournament offline with one URL write and one und
   await expect(page.getByRole("button", { name: /\bPools\b/ })).toContainText("36/36");
   await expect(knockout(page)).toContainText("16/16");
   await expect(fill(page)).toBeDisabled();
-  expect(new URL(page.url()).hash).toHaveLength(142); // 129 token characters + #predictions=.
+  const token = new URL(page.url()).hash.slice("#predictions=".length);
+  expect(token.startsWith("v3.")).toBe(true);
+  expect(token.length).toBeLessThanOrEqual(355); // Existing custom-result pins, no new profile.
+  expect(Buffer.from(token.slice(3), "base64url")[0]).toBe(1); // Retained 2027/defaults-v1 profile.
   expect(await page.evaluate(() => Reflect.get(window, "engineUrlWrites"))).toBe(1);
   expect(await page.evaluate(() => history.length)).toBe(historyLength);
   expect(editRequests).toEqual([]);
@@ -97,7 +100,7 @@ test("fill keeps conflicting choices visible and leaves dependent knockout match
   expect(page.url()).toBe(conflictUrl);
 });
 
-test("filling an old link preserves its saved scores and undo restores its original profile", async ({ page }) => {
+test("filling an old link preserves its profile and saved scores, with one undo", async ({ page }) => {
   await page.goto("/#predictions=v3.AYIKQA");
   const originalUrl = page.url();
   await card(page, 1).locator(".details-toggle").click();
@@ -108,6 +111,7 @@ test("filling an old link preserves its saved scores and undo restores its origi
   await fill(page).click();
   await expect(card(page, 1).locator(".result-preview strong")).toHaveText("By 7");
   await expect(knockout(page)).toContainText("16/16");
+  expect(Buffer.from(new URL(page.url()).hash.slice("#predictions=v3.".length), "base64url")[0]).toBe(1);
   await undo(page).click();
   expect(page.url()).toBe(originalUrl);
   await expect(page.locator(".fixture-card .result-preview strong")).toHaveCount(1);

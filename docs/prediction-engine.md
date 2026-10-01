@@ -1,8 +1,8 @@
 # First-pass prediction engine
 
-Fresh scenarios use `rankings-v1`. A winner pick fills unspecified scores, tries and bonuses from a deterministic World Rugby rating-gap projection. **Fill matches** fills every eligible unpicked fixture, regardless of the current view or pool filter, working through the pool and knockout dependencies to the bronze match and final. Existing choices and completed outcomes remain intact. Contradictory choices stay visible and can leave later fixtures waiting. The entire fill, including any incompatible dependent picks, is one undo action and one URL update.
+**Fill matches** projects every eligible unpicked fixture, regardless of the current view or pool filter, working through pool and knockout dependencies to bronze and the final. Existing choices and completed outcomes remain intact. Contradictory choices stay visible and can leave later fixtures waiting. The entire fill, including incompatible dependent-pick replacements, is one undo action and one URL update.
 
-The engine is plain TypeScript in `src/domain/rankings.ts`; immutable inputs are in `ranking-data.ts`. No credentials, requests or server state are required for editing or filling.
+The engine is independent plain TypeScript. `planRankingFill(scenario)` in `src/domain/ranking-fill.ts` works on a clone and returns `PredictionUpdate` values, conflict and replacement counts. It uses `rankings.ts`, immutable `ranking-data.ts` inputs and the shared `reconcileScenario` rules. The UI passes the plan to generic `controller.applyBatch`, which validates and applies all updates together. The planner writes no application state or URLs; no credentials, requests or server state are needed.
 
 ## Fixed inputs
 
@@ -21,12 +21,14 @@ Use rating-point difference because adjacent ranking positions can represent ver
 2. Project the losing score as `max(3, 21 - round(margin / 4))` and the winning score as the losing score plus the margin.
 3. Infer tries from `floor(score / 7)`, bounded to 15. Existing scoring rules derive try and losing bonuses.
 
-For example, Australia versus Hong Kong China has a rating gap of about 24.81, projecting **58–8**, a 50-point margin with **8–1 tries**. A one-point margin projects **22–21**. An explicitly chosen draw uses **21–21**; a knockout draw also needs an advancing team.
+For example, Australia versus Hong Kong China has a rating gap of about 24.81, projecting **58–8**, a 50-point margin with **8–1 tries**. A one-point margin projects **22–21**. Generated knockout outcomes include an advancing team bound to the actual participants.
 
-These constants are an initial app heuristic, not a fitted probability or score model. An explicit winner chooses which side receives the gap-based winning score. The existing constrained completion solver respects explicit margin, scores, tries and bonuses; impossible combinations remain conflicts. Generated numerical values stay suggestions rather than being written as explicit choices.
+These constants are an initial app heuristic, not a fitted probability or score model. Filling leaves existing picks alone. Manual winner choices retain the existing **24–17** completion, with **21–21** for a draw; the constrained solver continues to respect margin, scores, tries and bonuses. Generated numerical values are saved in `Scenario.resolved`, while intent contains only a pool winner or knockout advancing choice. This keeps suggested values distinct from explicit numerical choices.
 
 ## Replay and future changes
 
-Retain `defaults-v1` and its historical 24–17 / 21–21 behavior. V3 profiles 3/4 fix `rankings-v1` and the snapshots above; profiles 1/2 keep their original inputs. New data or formula changes require a new completion version/profile. Imported links never upgrade silently. An explicit Fill can upgrade an older scenario while preserving existing pinned outcomes, including dormant bracket picks; undo restores the original profile. [Link protocol](prediction-links.md)
+The engine changes no URL shape, transport/schema version, profile or completion metadata. Keep `defaults-v1` and v3 profiles 1/2 unchanged. Actual generated scores and tries use the existing custom saved-result encoding, so later formula/data changes cannot recompute a shared prediction. Shallow token budgets remain **9/11/73/129 characters**; a fully generated tournament has a **355-character budget** because it also saves the projected outcomes. [Link protocol](prediction-links.md)
 
-Future Consensus, Rugby model and Bookmakers methods can supply different deterministic completion seeds from permissible immutable snapshots. Calibration, probabilities and provider ingestion remain follow-ups. World Rugby's [published source terms](https://www.world.rugby/terms-and-conditions) do not supply an open-data/API licence; review publication permissions as part of provider work.
+The application publishes the batch once and records one session undo entry. Current edits replace the URL; browser Back/Forward as prediction undo is an explicit follow-up. Dormant matching knockout picks retain their pins; proven participant changes replace incompatible picks inside the same batch.
+
+Future Consensus, Rugby model and Bookmakers methods can return the same batch-update contract using permissible immutable snapshots. Calibration, probabilities and provider ingestion remain follow-ups. World Rugby's [published source terms](https://www.world.rugby/terms-and-conditions) do not supply an open-data/API licence; review publication permissions as part of provider work.

@@ -3,8 +3,9 @@ import fc from "fast-check";
 import { deflateSync, strToU8 } from "fflate";
 import { decodeScenario, encodeScenario, validateScenario } from "./codec";
 import { createScenarioController, emptyScenario } from "./controller";
-import type { CompletionVersion, PredictionIntent, Scenario } from "../domain/types";
+import type { PredictionIntent, Scenario } from "../domain/types";
 import { intentFields } from "../domain/completion";
+import { planRankingFill } from "../domain/ranking-fill";
 
 const originalV2 = "v2.rwc2027.fixtures-2026-02.AE4ARItWKijKL8sszszPS8zRLTNU0lFKSU1LLM0pKQbzoqMNdQx1opUy8nNTlWJ18kpzcnSijUx0DM11jHWMdCDiYOFYIAAA";
 function compactFrame(...fields: [number, number][]): string {
@@ -41,8 +42,8 @@ const intent = fc.record({
   return (Object.keys(present).length ? present : { winner: "home" }) as PredictionIntent;
 });
 
-export function fullScenario(completionVersion: CompletionVersion = "rankings-v1"): Scenario {
-  const controller = createScenarioController(emptyScenario("rwc2027", completionVersion));
+export function fullScenario(): Scenario {
+  const controller = createScenarioController();
   for (const fixture of controller.getState().derived.fixtures.filter((entry) => entry.stage === "pool")) controller.update(fixture.id, { winner: "home" });
   for (const fixture of controller.getState().derived.fixtures.filter((entry) => entry.stage !== "pool")) controller.update(fixture.id, { advancing: "home" });
   return controller.getState().scenario;
@@ -50,9 +51,9 @@ export function fullScenario(completionVersion: CompletionVersion = "rankings-v1
 
 describe("Scenario URL replay", () => {
   it("keeps empty and winner-only links sparse and fixes their versioned default outcomes", () => {
-    expect(encodeScenario(emptyScenario("rwc2027", "defaults-v1"))).toBe("v3.AYA");
-    expect(encodeScenario(emptyScenario("rwc2023", "defaults-v1"))).toBe("v3.AoA");
-    const controller = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
+    expect(encodeScenario(emptyScenario())).toBe("v3.AYA");
+    expect(encodeScenario(emptyScenario("rwc2023"))).toBe("v3.AoA");
+    const controller = createScenarioController();
     controller.update(1, { winner: "home" });
     expect(encodeScenario(controller.getState().scenario)).toBe("v3.AYIKQA");
     const decoded = decodeScenario("v3.AYIKQA");
@@ -62,39 +63,9 @@ describe("Scenario URL replay", () => {
     expect(decodeScenario("v3.AYIKQA").resolved![1].homeScore).toBe(24);
     controller.update(1, { margin: 15, homeTryBonus: true });
     expect(encodeScenario(controller.getState().scenario).length).toBeLessThanOrEqual(11);
-    const pools = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
-    for (let id = 1; id <= 36; id++) pools.update(id, { winner: "home" });
-    expect(encodeScenario(pools.getState().scenario).length).toBeLessThanOrEqual(73);
-  });
-
-  it("gives ranking suggestions their own immutable profiles without growing sparse links", () => {
-    expect(encodeScenario(emptyScenario())).toBe("v3.A4A");
-    expect(encodeScenario(emptyScenario("rwc2023"))).toBe("v3.BIA");
-    const controller = createScenarioController();
-    controller.update(1, { winner: "home" });
-    const token = encodeScenario(controller.getState().scenario);
-    expect(token).toBe("v3.A4IKQA");
-    expect(token.length).toBeLessThanOrEqual(9);
-    const decoded = decodeScenario(token);
-    expect(decoded.completionVersion).toBe("rankings-v1");
-    expect(decoded.resolved![1]).toEqual({ homeScore: 58, awayScore: 8, homeTries: 8, awayTries: 1, winner: "home" });
-    expect(decodeScenario("v3.AYIKQA").resolved![1].homeScore).toBe(24);
-    controller.update(1, { margin: 15, homeTryBonus: true });
-    expect(encodeScenario(controller.getState().scenario).length).toBeLessThanOrEqual(11);
     const pools = createScenarioController();
     for (let id = 1; id <= 36; id++) pools.update(id, { winner: "home" });
     expect(encodeScenario(pools.getState().scenario).length).toBeLessThanOrEqual(73);
-    const ranked = createScenarioController();
-    ranked.fillFromRankings();
-    expect(encodeScenario(ranked.getState().scenario).length).toBeLessThanOrEqual(129);
-    expect(decodeScenario(encodeScenario(ranked.getState().scenario))).toEqual(ranked.getState().scenario);
-    const legacy = createScenarioController(emptyScenario("rwc2023"));
-    legacy.update(1, { winner: "home" });
-    expect(encodeScenario(legacy.getState().scenario)).toBe("v3.BIIKQA");
-    expect(decodeScenario("v3.BIIKQA")).toEqual(legacy.getState().scenario);
-    legacy.fillFromRankings();
-    expect(decodeScenario(encodeScenario(legacy.getState().scenario))).toEqual(legacy.getState().scenario);
-    expect(Object.keys(legacy.getState().scenario.resolved!)).toHaveLength(48);
   });
 
   it("preserves absent versus empty saved outcomes and every explicit zero/false or maximum field", () => {
@@ -127,8 +98,8 @@ describe("Scenario URL replay", () => {
     }));
   });
 
-  it.each(["defaults-v1", "rankings-v1"] as const)("shares a completed 52-match %s scenario compactly, including replayed outcomes and participants", (version) => {
-    const scenario = fullScenario(version);
+  it("shares a completed 52-match scenario compactly, including replayed outcomes and participants", () => {
+    const scenario = fullScenario();
     expect(Object.keys(scenario.predictions)).toHaveLength(52);
     expect(Object.keys(scenario.resolved!)).toHaveLength(52);
     const payload = encodeScenario(scenario);
@@ -136,6 +107,64 @@ describe("Scenario URL replay", () => {
     expect(payload.length).toBeLessThanOrEqual(129);
     expect(payload.length).toBeLessThan(JSON.stringify(scenario).length / 2);
     expect(decodeScenario(payload)).toEqual(scenario);
+  });
+
+  it.each(["rwc2027", "rwc2023"] as const)("replays batch engine projections in the unchanged %s scenario and URL format", (tournamentId) => {
+    const controller = createScenarioController(emptyScenario(tournamentId));
+    const identity = controller.getState().scenario;
+    const plan = planRankingFill(identity);
+    controller.applyBatch(plan.updates);
+    const filled = controller.getState().scenario;
+    const token = encodeScenario(filled);
+    const bytes = atob(token.slice(3).replace(/-/g, "+").replace(/_/g, "/"));
+    expect(bytes.charCodeAt(0)).toBe(tournamentId === "rwc2027" ? 1 : 2);
+    expect(filled).toMatchObject({
+      schemaVersion: identity.schemaVersion, tournamentId: identity.tournamentId,
+      datasetVersion: identity.datasetVersion, rulesVersion: identity.rulesVersion,
+      completionVersion: "defaults-v1",
+    });
+    expect(Object.keys(filled.resolved!)).toHaveLength(tournamentId === "rwc2027" ? 52 : 48);
+    expect(token).toMatch(/^v3\.[A-Za-z0-9_-]+$/);
+    // Full model scores are existing custom pins, rather than a new transport
+    // profile. The unchanged manual-choice budgets are asserted separately above.
+    expect(token.length).toBeLessThanOrEqual(355);
+    expect(decodeScenario(token)).toEqual(filled);
+    expect(createScenarioController(decodeScenario(token)).getState().scenario).toEqual(filled);
+    for (const update of plan.updates) {
+      expect(filled.predictions[update.fixtureId].intent).toEqual(update.intent);
+      expect(filled.resolved![update.fixtureId]).toEqual(update.result);
+      expect(Object.keys(update.intent)).toEqual([update.participants ? "advancing" : "winner"]);
+    }
+    if (tournamentId === "rwc2027") {
+      expect(filled.resolved![1]).toEqual({ homeScore: 58, awayScore: 8, homeTries: 8, awayTries: 1, winner: "home" });
+      expect(decodeScenario("v3.AYIKQA").resolved![1].homeScore).toBe(24);
+      controller.update(1, { winner: "away" });
+      expect(controller.getState().scenario.resolved![1]).toEqual({ homeScore: 17, awayScore: 24, homeTries: 2, awayTries: 3, winner: "away" });
+      expect(controller.getState().scenario.completionVersion).toBe("defaults-v1");
+    }
+  });
+
+  it("keeps the existing default profiles and rejects new profile identifiers", () => {
+    expect(() => decodeScenario(compactFrame([3, 8], [1, 1], [0, 6]))).toThrow(/unsupported/);
+    expect(() => decodeScenario(compactFrame([4, 8], [1, 1], [0, 6]))).toThrow(/unsupported/);
+  });
+
+  it("shares and restores dormant engine pins while a pool conflict hides their participants", () => {
+    const controller = createScenarioController();
+    controller.applyBatch(planRankingFill(controller.getState().scenario).updates);
+    const complete = controller.getState().scenario;
+    controller.update(1, { homeScore: 0, awayScore: 10 });
+    const dormant = controller.getState().scenario;
+    expect(controller.getState().derived.poolsComplete).toBe(false);
+    const restored = createScenarioController(decodeScenario(encodeScenario(dormant)));
+    expect(restored.getState().scenario).toEqual(dormant);
+    restored.update(1, { homeScore: complete.resolved![1].homeScore, awayScore: complete.resolved![1].awayScore });
+    expect(restored.getState().derived.poolsComplete).toBe(true);
+    for (const fixture of restored.getState().derived.fixtures.filter((entry) => entry.stage !== "pool")) {
+      expect(fixture.prediction).toEqual(complete.predictions[fixture.id]);
+      expect(fixture.result).toEqual(complete.resolved![fixture.id]);
+    }
+    expect(restored.getState().scenario.completionVersion).toBe("defaults-v1");
   });
 
   it("replays saved inferred outcomes without substituting the current defaults", () => {

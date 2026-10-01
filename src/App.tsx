@@ -1,6 +1,7 @@
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { createBrowserController } from "./state/browser";
 import { rankingSnapshot } from "./domain/rankings";
+import { planRankingFill } from "./domain/ranking-fill";
 import { Icon } from "./components/Icon";
 import { MatchDetailsDialog } from "./components/MatchDetailsDialog";
 import { KnockoutBracket, KnockoutRounds, PoolsByPool, Timeline } from "./components/TournamentViews";
@@ -121,7 +122,13 @@ function App() {
         </div></div></Show>
         <button type="button" class="fill-button" disabled={Boolean(urlError()) || !canFill()}
           aria-label="Fill unpicked matches" title={`Fill all unpicked matches using World Rugby rankings (${rankingSource().effectiveDate}). Keeps your existing picks; undo in one action.`}
-          onClick={() => controller.fillFromRankings()}>Fill matches</button>
+          onClick={() => {
+            const { updates, cleared, conflicts } = planRankingFill(state().scenario);
+            const notice = `${updates.length} ${updates.length === 1 ? "match" : "matches"} filled from world rankings.` +
+              (cleared ? ` ${cleared} dependent ${cleared === 1 ? "pick was" : "picks were"} replaced because the teams changed.` : "") +
+              (conflicts ? ` ${conflicts} conflicting ${conflicts === 1 ? "match still needs" : "matches still need"} your attention.` : "");
+            controller.applyBatch(updates, notice);
+          }}>Fill matches</button>
       </div></div>
     </header>
     <main class="app-main">

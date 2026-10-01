@@ -1,4 +1,4 @@
-// Immutable inputs for rankings-v1. Keep these snapshots when adding future methods.
+// Immutable inputs for the first ranking engine. Keep their dated provenance.
 // Official dated source and raw-response SHA-256 are retained for provenance.
 export const rankingSnapshotData = {
   "rwc2027": {

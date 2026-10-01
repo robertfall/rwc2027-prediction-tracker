@@ -8,12 +8,10 @@ New writes use `#predictions=v3.<base64url>`: a sparse bit-packed token containi
 | --- | --- |
 | 1 | 2027, `fixtures-2026-02`, `provisional-v1`, `defaults-v1`, draw-date rankings from 1 December 2025 |
 | 2 | 2023, `fixtures-v1`, `2023-v1`, `defaults-v1`, rankings from 2 October 2023 |
-| 3 | 2027, `fixtures-2026-02`, `provisional-v1`, `rankings-v1`, engine ratings from 28 September 2026; qualification tie-break inputs unchanged |
-| 4 | 2023, `fixtures-v1`, `2023-v1`, `rankings-v1`, engine ratings from 2 October 2023; qualification tie-break inputs unchanged |
 
 Each profile also fixes the team-ID/index order. Retain its tournament, rules, rankings and completion implementation permanently. Add a new profile when any input or index order changes; never reinterpret an existing byte with newer defaults.
 
-Fresh scenarios use `rankings-v1`. Old links retain their completion version and saved results. **Fill matches** explicitly changes an older scenario to the ranking profile while preserving existing choices and saved outcomes; one undo restores the original version and URL. Ranking-generated scores/tries remain inferred, so the representative sparse budgets below also apply to profiles 3/4. [Engine inputs and formula](prediction-engine.md)
+Prediction methods do not change this protocol or its profiles. **Fill matches** plans outcomes separately, then applies one batch with one URL write. Its scores and tries are pinned through the existing saved-result exception mode, preserving the scenario's `defaults-v1` metadata and old manual completion. Existing choices and saved outcomes remain intact. Changing engine data or formulas affects later generated results; shared links replay their saved outcomes. [Engine inputs and formula](prediction-engine.md)
 
 The stream uses most-significant bits first:
 
@@ -37,9 +35,9 @@ Measured token lengths include the version prefix and exclude the hostname/path 
 
 | Representative scenario | Historical v2 | V3 |
 | --- | ---: | ---: |
-| One winner choice | 124 | 9 (`v3.AYIKQA` old defaults; `v3.A4IKQA` rankings) |
+| One winner choice | 124 | 9 (`v3.AYIKQA`) |
 | One detailed match: margin 15 and try bonus | 134 | 11 |
 | All 36 pool winners | 250 | 73 |
 | All 52 winner/advancement choices with bindings | 468 | 129 |
 
-These fixed representative budgets protect shallow sharing; richer explicit outcomes can require more bits. Links retain intent, valid completed outcomes and version identity, while view/filter state and undo history stay local.
+These fixed representative budgets protect shallow sharing. A fully generated 52-match tournament pins projected scores and tries, with a **355-character token budget**; those additional outcomes use existing bits, without changing URL shape or versions. Links retain intent, valid completed outcomes and version identity, while view/filter state and undo history stay local. Edits use `replaceState`; browser Back/Forward as prediction undo remains a follow-up.

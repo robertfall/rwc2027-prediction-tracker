@@ -5,7 +5,7 @@ import { PredictionLinkError } from "../services/results/compression";
 
 // Wire identities and team-index order are permanent. Add a new profile when any
 // dataset, rules, rankings or completion algorithm changes; retain old readers.
-const legacyProfiles = [
+const profiles = [
   {
     id: 1, tournamentId: "rwc2027", datasetVersion: "fixtures-2026-02",
     rulesVersion: "provisional-v1", completionVersion: "defaults-v1",
@@ -16,11 +16,6 @@ const legacyProfiles = [
     rulesVersion: "2023-v1", completionVersion: "defaults-v1",
     teams: ["nz", "au", "cl", "za", "it", "ge", "ro", "ar", "fj", "ie", "gb-sct", "uy", "pt", "fr", "jp", "ws", "gb-eng", "gb-wls", "to", "na"],
   },
-] as const;
-const profiles = [
-  ...legacyProfiles,
-  { ...legacyProfiles[0], id: 3, completionVersion: "rankings-v1" },
-  { ...legacyProfiles[1], id: 4, completionVersion: "rankings-v1" },
 ] as const;
 type Profile = (typeof profiles)[number];
 export const MAX_COMPACT_BYTES = 1024;
@@ -82,7 +77,7 @@ function defaultResult(prediction: Prediction, fixture: Fixture, tournament: Tou
   // are unresolved. Unbound knockouts keep their completed values explicitly.
   const result = completePrediction(prediction.intent, fixture, tournament,
     tournament.teams.find((team) => team.id === homeId),
-    tournament.teams.find((team) => team.id === awayId), profile.completionVersion).result;
+    tournament.teams.find((team) => team.id === awayId)).result;
   defaultResults.set(slot, { key, result });
   return result ? { ...result } : undefined;
 }

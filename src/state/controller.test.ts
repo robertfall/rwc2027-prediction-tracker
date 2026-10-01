@@ -2,12 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { createScenarioController, emptyScenario, type ScenarioController } from "./controller";
 import { defaultTournament } from "../domain/tournaments";
 import { decodeScenario, encodeScenario } from "./codec";
+import { planRankingFill } from "../domain/ranking-fill";
 
 function pickPools(controller: ScenarioController): void {
   for (const fixture of controller.getState().derived.fixtures.filter((entry) => entry.stage === "pool")) controller.update(fixture.id, { winner: "home" });
 }
 function pickBracket(controller: ScenarioController): void {
   for (const fixture of controller.getState().derived.fixtures.filter((entry) => entry.stage !== "pool")) controller.update(fixture.id, { advancing: "home" });
+}
+function fillFromRankings(controller: ScenarioController): void {
+  const { updates, conflicts, cleared } = planRankingFill(controller.getState().scenario);
+  const notice = `${updates.length} ${updates.length === 1 ? "match" : "matches"} filled from world rankings.` +
+    (cleared ? ` ${cleared} dependent ${cleared === 1 ? "pick was" : "picks were"} replaced because the teams changed.` : "") +
+    (conflicts ? ` ${conflicts} conflicting ${conflicts === 1 ? "match still needs" : "matches still need"} your attention.` : "");
+  controller.applyBatch(updates, notice);
 }
 const firstPool = defaultTournament.fixtures.find((fixture) => fixture.stage === "pool")!.id;
 
@@ -131,7 +139,7 @@ describe("Local scenario actions and history", () => {
     const before = controller.getState().scenario;
     const published = vi.fn();
     controller.subscribe(published);
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     const filled = controller.getState().scenario;
     const total = tournamentId === "rwc2027" ? 52 : 48;
     expect(published).toHaveBeenCalledOnce();
@@ -145,7 +153,7 @@ describe("Local scenario actions and history", () => {
     }
     expect(controller.getState().notice).toBe(`${total} matches filled from world rankings.`);
     const completedState = controller.getState();
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     expect(controller.getState()).toBe(completedState);
     expect(published).toHaveBeenCalledOnce();
     controller.undo();
@@ -161,7 +169,7 @@ describe("Local scenario actions and history", () => {
     controller.update(1, { winner: "away", homeScore: 3, awayScore: 33, homeTries: 0, awayTries: 4 });
     controller.update(2, { awayLosingBonus: false });
     const before = controller.getState().scenario;
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     const after = controller.getState().scenario;
     for (const id of [1, 2]) {
       expect(after.predictions[id]).toEqual(before.predictions[id]);
@@ -178,7 +186,7 @@ describe("Local scenario actions and history", () => {
     const controller = createScenarioController();
     controller.update(1, { winner: "home", homeScore: 0, awayScore: 10 });
     const conflicted = controller.getState().scenario.predictions[1];
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     expect(controller.getState().scenario.predictions[1]).toEqual(conflicted);
     expect(controller.getState().scenario.resolved![1]).toBeUndefined();
     expect(Object.keys(controller.getState().scenario.predictions)).toHaveLength(36);
@@ -186,7 +194,7 @@ describe("Local scenario actions and history", () => {
     expect(controller.getState().derived.poolsComplete).toBe(false);
     expect(controller.getState().notice).toBe("35 matches filled from world rankings. 1 conflicting match still needs your attention.");
     const blocked = controller.getState();
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     expect(controller.getState()).toBe(blocked);
   });
 
@@ -195,7 +203,7 @@ describe("Local scenario actions and history", () => {
     pickPools(controller);
     controller.update(37, { homeScore: 20, awayScore: 20 });
     const drawn = controller.getState().scenario.predictions[37];
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     const fixture = controller.getState().derived.fixtures.find((entry) => entry.id === 37)!;
     expect(fixture.prediction).toEqual(drawn);
     expect(fixture.issues).toContain("Choose which team advances after the drawn score.");
@@ -208,14 +216,14 @@ describe("Local scenario actions and history", () => {
     expect(controller.getState().derived.fixtures.some((entry) => entry.stage !== "pool" && entry.id !== 37 && entry.result && !entry.issues.length)).toBe(true);
   });
 
-  it("migrates an old completion profile only during an effective fill while preserving its pins", () => {
-    const controller = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
+  it("keeps the existing completion profile and manual defaults when applying a ranking batch", () => {
+    const controller = createScenarioController(emptyScenario("rwc2027"));
     controller.update(1, { winner: "home" });
     const before = controller.getState().scenario;
     expect(before.resolved![1].homeScore).toBe(24);
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     const ranked = controller.getState().scenario;
-    expect(ranked.completionVersion).toBe("rankings-v1");
+    expect(ranked.completionVersion).toBe(before.completionVersion);
     expect(ranked.predictions[1]).toEqual(before.predictions[1]);
     expect(ranked.resolved![1]).toEqual(before.resolved![1]);
     expect(createScenarioController(decodeScenario(encodeScenario(ranked))).getState().scenario).toEqual(ranked);
@@ -223,19 +231,19 @@ describe("Local scenario actions and history", () => {
     expect(controller.getState().scenario).toEqual(before);
     controller.redo();
     controller.update(1, { winner: "away" });
-    expect(controller.getState().scenario.resolved![1]).toMatchObject({ homeScore: 8, awayScore: 58, winner: "away" });
+    expect(controller.getState().scenario.resolved![1]).toMatchObject({ homeScore: 17, awayScore: 24, winner: "away" });
 
-    const complete = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
+    const complete = createScenarioController(emptyScenario("rwc2027"));
     pickPools(complete); pickBracket(complete);
     const unchanged = complete.getState();
-    complete.fillFromRankings();
+    fillFromRankings(complete);
     expect(complete.getState()).toBe(unchanged);
     expect(complete.getState().scenario.completionVersion).toBe("defaults-v1");
   });
 
   it("restores dormant knockout pins when filling a missing pool result keeps the same participants", () => {
     const controller = createScenarioController();
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     const complete = controller.getState().scenario;
     controller.update(1, { winner: undefined });
     const dormant = controller.getState().scenario;
@@ -244,7 +252,7 @@ describe("Local scenario actions and history", () => {
       expect(dormant.predictions[fixture.id]).toEqual(complete.predictions[fixture.id]);
       expect(dormant.resolved![fixture.id]).toEqual(complete.resolved![fixture.id]);
     }
-    controller.fillFromRankings();
+    fillFromRankings(controller);
     expect(controller.getState().scenario).toEqual(complete);
     expect(controller.getState().notice).toBe("1 match filled from world rankings.");
     controller.undo();
@@ -252,7 +260,7 @@ describe("Local scenario actions and history", () => {
   });
 
   it("replaces newly incompatible dormant knockout picks and fills their descendants in the same action", () => {
-    const original = createScenarioController(emptyScenario("rwc2027", "defaults-v1"));
+    const original = createScenarioController(emptyScenario("rwc2027"));
     pickPools(original); pickBracket(original);
     const complete = original.getState().scenario;
     let replacement: ReturnType<typeof createScenarioController> | undefined;
@@ -261,7 +269,7 @@ describe("Local scenario actions and history", () => {
       const candidate = createScenarioController(complete);
       candidate.update(fixture.id, { winner: undefined });
       const dormant = candidate.getState().scenario;
-      candidate.fillFromRankings();
+      fillFromRankings(candidate);
       const changedBinding = candidate.getState().derived.fixtures.some((entry) => entry.stage !== "pool" &&
         JSON.stringify(entry.prediction?.participants) !== JSON.stringify(complete.predictions[entry.id].participants));
       if (changedBinding) { replacement = candidate; beforeFill = dormant; break; }
@@ -276,5 +284,46 @@ describe("Local scenario actions and history", () => {
     expect(replacement!.getState().scenario).toEqual(beforeFill);
     replacement!.redo();
     expect(replacement!.getState().scenario).toEqual(afterFill);
+  });
+  it("rejects invalid batches atomically and does not publish or change undo history", () => {
+    const controller = createScenarioController();
+    const before = controller.getState();
+    const published = vi.fn();
+    controller.subscribe(published);
+    const valid = planRankingFill(before.scenario).updates;
+    for (const invalid of [
+      [...valid, valid[0]],
+      [...valid.slice(0, -1), { ...valid.at(-1)!, fixtureId: 99 }],
+      [{ ...valid[0], result: { ...valid[0].result, homeScore: 256 } }],
+      [{ ...valid[0], result: { ...valid[0].result, homeTries: 15 } }],
+      [{ ...valid[0], result: { ...valid[0].result, winner: "away" as const } }],
+      [...valid.slice(0, -1), { ...valid.at(-1)!, participants: undefined }],
+      [...valid.slice(0, -1), { ...valid.at(-1)!, participants: ["au", "hk"] as [string, string] }],
+    ]) {
+      expect(() => controller.applyBatch(invalid)).toThrow();
+      expect(controller.getState()).toBe(before);
+    }
+    expect(published).not.toHaveBeenCalled();
+    controller.applyBatch([]);
+    expect(controller.getState()).toBe(before);
+  });
+
+  it("owns batch inputs, accepts an unordered batch and starts one action after a grouped edit", () => {
+    const controller = createScenarioController();
+    controller.update(1, { winner: "home" }, "details");
+    controller.update(1, { margin: 3 }, "details");
+    const before = controller.getState().scenario;
+    const updates = planRankingFill(before).updates.reverse();
+    controller.applyBatch(updates);
+    const filled = controller.getState().scenario;
+    updates[0].intent.advancing = "away";
+    updates[0].participants![0] = "unknown";
+    updates[0].result.homeScore = 0;
+    expect(controller.getState().scenario).toBe(filled);
+    expect(createScenarioController(decodeScenario(encodeScenario(filled))).getState().scenario).toEqual(filled);
+    controller.undo();
+    expect(controller.getState().scenario).toEqual(before);
+    controller.undo();
+    expect(controller.getState().scenario.predictions).toEqual({});
   });
 });

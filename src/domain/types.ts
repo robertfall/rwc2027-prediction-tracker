@@ -1,7 +1,6 @@
 export type Side = "home" | "away";
 export type Winner = Side | "draw";
 export type Stage = "pool" | "round16" | "quarter" | "semi" | "bronze" | "final";
-export type CompletionVersion = "defaults-v1" | "rankings-v1";
 
 export interface Team {
   id: string;
@@ -74,12 +73,20 @@ export interface CompletedResult {
   advancing?: Side;
 }
 
+/** A fully planned edit, independent of history and prediction-link encoding. */
+export interface PredictionUpdate {
+  fixtureId: number;
+  intent: PredictionIntent;
+  participants?: [string, string];
+  result: CompletedResult;
+}
+
 export interface Scenario {
   schemaVersion: 2;
   tournamentId: Tournament["id"];
   datasetVersion: string;
   rulesVersion: string;
-  completionVersion: CompletionVersion;
+  completionVersion: "defaults-v1";
   predictions: Record<number, Prediction>;
   resolved?: Record<number, CompletedResult>;
 }

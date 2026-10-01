@@ -48,7 +48,7 @@ export function validateScenario(value: unknown): asserts value is Scenario {
   if (value.tournamentId !== "rwc2023" && value.tournamentId !== "rwc2027") invalid("This prediction link belongs to an unsupported tournament.");
   const tournament = getTournament(value.tournamentId);
   if (value.datasetVersion !== tournament.datasetVersion || value.rulesVersion !== tournament.rulesVersion) invalid("This prediction link belongs to a different fixture dataset or rules version.");
-  if (value.completionVersion !== "defaults-v1" && value.completionVersion !== "rankings-v1") invalid("This prediction link uses an unsupported completion version.");
+  if (value.completionVersion !== "defaults-v1") invalid("This prediction link uses an unsupported completion version.");
   if (!object(value.predictions) || (value.resolved !== undefined && !object(value.resolved))) invalid();
   const fixtures = new Map(tournament.fixtures.map((fixture) => [fixture.id, fixture]));
   const teams = new Set(tournament.teams.map((team) => team.id));

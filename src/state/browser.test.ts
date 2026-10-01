@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBrowserController, type BrowserAdapter } from "./browser";
 import { encodeScenario } from "./codec";
 import { createScenarioController } from "./controller";
+import { planRankingFill } from "../domain/ranking-fill";
 
 const originalV2 = "v2.rwc2027.fixtures-2026-02.AE4ARItWKijKL8sszszPS8zRLTNU0lFKSU1LLM0pKQbzoqMNdQx1opUy8nNTlWJ18kpzcnSijUx0DM11jHWMdCDiYOFYIAAA";
 
@@ -120,23 +121,28 @@ describe("Browser URL and history ownership", () => {
     expect(web.writes).toHaveLength(1);
   });
 
-  it("shares ranking fill with one URL write and replays its profile, pins and atomic undo", () => {
+  it("publishes a ranking batch through one URL update without changing the shared scenario version", () => {
     const web = adapter(`/?from=friend#predictions=${originalV2}`);
     const app = createBrowserController(web.web, "/");
     const before = app.controller.getState().scenario;
-    expect(before.completionVersion).toBe("defaults-v1");
-    app.controller.fillFromRankings();
+    const plan = planRankingFill(before);
+    app.controller.applyBatch(plan.updates);
     expect(web.writes).toHaveLength(1);
     const filled = app.controller.getState().scenario;
     const url = web.url();
-    expect(filled.completionVersion).toBe("rankings-v1");
+    expect(filled.completionVersion).toBe(before.completionVersion);
+    expect(filled.schemaVersion).toBe(before.schemaVersion);
+    expect(filled.tournamentId).toBe(before.tournamentId);
+    expect(filled.datasetVersion).toBe(before.datasetVersion);
+    expect(filled.rulesVersion).toBe(before.rulesVersion);
     expect(Object.keys(filled.resolved!)).toHaveLength(52);
     expect(filled.resolved![1]).toEqual(before.resolved![1]);
     expect(url).toContain("/?from=friend#predictions=v3.");
     const fresh = createBrowserController(adapter(url).web, "/");
     expect(fresh.controller.getState().scenario).toEqual(filled);
     expect(fresh.controller.getState().canUndo).toBe(false);
-    app.controller.fillFromRankings();
+    app.controller.applyBatch(plan.updates);
+    app.controller.applyBatch(planRankingFill(filled).updates);
     expect(web.writes).toHaveLength(1);
     app.controller.undo();
     expect(web.writes).toHaveLength(2);
