@@ -2,6 +2,10 @@ name: Smoke production
 
 on:
   workflow_dispatch:
+  # Verify this workflow after it changes; ordinary app pushes deploy via Check.
+  push:
+    branches: [main]
+    paths: [.github/workflows/smoke-production.yml]
 
 permissions:
   contents: read
