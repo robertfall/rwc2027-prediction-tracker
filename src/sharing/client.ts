@@ -25,8 +25,8 @@ export function captureShareSnapshot(scenario: Scenario, href: string, basePath 
   const token = encodeScenario(scenario);
   const empty = scenario.tournamentId === "rwc2027" && !Object.keys(scenario.predictions).length;
   const url = new URL(basePath, href);
+  url.search = new URL(href).search;
   if (!empty) {
-    url.search = new URL(href).search;
     url.hash = `predictions=${token}`;
   }
   return Object.freeze({ token, fullUrl: url.href, empty });
@@ -41,7 +41,9 @@ export function createShareClient(options: ShareClientOptions = {}) {
   const lookups = new Map<string, Promise<string | undefined>>();
 
   function shortLink(snapshot: ShareSnapshot, alias: string): ShareLink {
-    return { url: new URL(`/s/${alias}`, snapshot.fullUrl).href, shortUnavailable: false };
+    const url = new URL(`/s/${alias}`, snapshot.fullUrl);
+    url.search = new URL(snapshot.fullUrl).search;
+    return { url: url.href, shortUnavailable: false };
   }
 
   function cachedLink(snapshot: ShareSnapshot): ShareLink | undefined {

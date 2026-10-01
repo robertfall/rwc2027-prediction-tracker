@@ -69,7 +69,12 @@ export interface MatchDetailsDialogProps {
   fixture: ResolvedFixture;
   controller: ScenarioController;
   onClose: () => void;
-  returnFocus?: HTMLElement;
+  returnFocus?: HTMLElement | (() => HTMLElement | undefined);
+  onCopyLink: () => Promise<void>;
+  sharing: boolean;
+  copyDisabled?: boolean;
+  copyStatus?: string;
+  manualUrl?: string;
 }
 
 /** One live editing session, including its dependent consequences, is one undo action. */
@@ -90,7 +95,7 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
     closed = true;
     props.controller.finishGroup();
     if (dialog.open) dialog.close();
-    const returnFocus = props.returnFocus;
+    const returnFocus = typeof props.returnFocus === "function" ? props.returnFocus() : props.returnFocus;
     props.onClose();
     queueMicrotask(() => { if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); });
   }
@@ -108,7 +113,8 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
   onMount(() => {
     props.controller.finishGroup();
     dialog.showModal();
-    dialog.querySelector<HTMLButtonElement>(".detail-winner-options button:not(:disabled)")?.focus();
+    (dialog.querySelector<HTMLButtonElement>(".detail-winner-options button:not(:disabled)")
+      ?? dialog.querySelector<HTMLButtonElement>(".match-dialog-close"))?.focus();
   });
   onCleanup(() => {
     closed = true;
@@ -133,6 +139,7 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
     <Show when={result()}><div class="match-dialog-preview" aria-live="polite"><strong>{result()!.homeScore} – {result()!.awayScore}</strong>
       <span>{result()!.homeTries} – {result()!.awayTries} tries</span>
     </div></Show>
+    <Show when={!ready()}><p class="match-dialog-waiting" role="status">Waiting on earlier picks. Complete the earlier matches to edit this game.</p></Show>
     <Show when={props.fixture.issues.length > 0}><ul class="fixture-issues" aria-live="polite"><For each={props.fixture.issues}>{(issue) => <li>{issue}</li>}</For></ul></Show>
     <fieldset class="detail-fields" disabled={!ready()}>
       <legend class="sr-only">Match {props.fixture.id} scoring details</legend>
@@ -181,8 +188,13 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
         </div>}</For></div>
       </details>
     </fieldset>
-    <div class="details-bottom"><button type="button" class="detail-clear" disabled={!props.fixture.prediction} onClick={clear}>Clear pick</button>
+    <div class="details-bottom"><button type="button" class="detail-clear" disabled={!ready() || !props.fixture.prediction} onClick={clear}>Clear pick</button>
+      <button type="button" class="icon-button match-dialog-copy" aria-label="Copy match link" title="Copy match link"
+        disabled={props.sharing || props.copyDisabled} aria-busy={props.sharing} onClick={() => void props.onCopyLink()}><Icon name="link" /></button>
       <button type="button" class="detail-done" onClick={close}>Done</button></div>
+    <div class="match-dialog-share-status" role="status" aria-live="polite">{props.copyStatus}</div>
+    <Show when={props.manualUrl}><label class="manual-share match-dialog-manual-link">Your match link<input type="text" readonly value={props.manualUrl}
+      onFocus={(event) => event.currentTarget.select()} /></label></Show>
     <p class="match-dialog-venue">{props.fixture.venue}</p>
   </dialog>;
 }

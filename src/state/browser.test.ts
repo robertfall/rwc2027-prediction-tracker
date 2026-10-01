@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBrowserController, type BrowserAdapter, type BrowserSharing } from "./browser";
 import { encodeScenario } from "./codec";
-import { createScenarioController } from "./controller";
+import { createScenarioController, emptyScenario } from "./controller";
 import { planRankingFill } from "../domain/ranking-fill";
 
 const originalV2 = "v2.rwc2027.fixtures-2026-02.AE4ARItWKijKL8sszszPS8zRLTNU0lFKSU1LLM0pKQbzoqMNdQx1opUy8nNTlWJ18kpzcnSijUx0DM11jHWMdCDiYOFYIAAA";
@@ -30,6 +30,161 @@ function pick(id = 1, winner: "home" | "away" = "home") {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("Browser URL and history ownership", () => {
+  it("reads a match destination without writing or altering the prediction snapshot", () => {
+    for (const scenario of [pick(), emptyScenario(), emptyScenario("rwc2023")]) {
+      const web = adapter(`/?match=25#predictions=${encodeScenario(scenario)}`);
+      const app = createBrowserController(web.web, "/");
+      expect(app.matchId()).toBe(25);
+      expect(app.controller.getState().scenario).toEqual(scenario);
+      expect(app.controller.getState().canUndo).toBe(false);
+      expect(web.writes).toEqual([]);
+      app.dispose();
+    }
+    const unresolved = createBrowserController(adapter("/?match=52").web, "/");
+    expect(unresolved.matchId()).toBe(52);
+    expect(unresolved.controller.getState().derived.fixtures.find((fixture) => fixture.id === 52)?.homeTeam).toBeUndefined();
+    unresolved.dispose();
+  });
+
+  it("opens and closes a destination with URL-only notifications and no prediction undo entry", () => {
+    const web = adapter("/?from=friend");
+    const app = createBrowserController(web.web, "/");
+    app.controller.update(1, { winner: "home" });
+    const original = web.url();
+    const before = app.controller.getState();
+    const listener = vi.fn();
+    app.subscribe(listener);
+    app.setMatch(25);
+    expect(app.matchId()).toBe(25);
+    expect(web.url()).toBe(original.replace("?from=friend", "?from=friend&match=25"));
+    expect(app.controller.getState()).toBe(before);
+    expect(listener).toHaveBeenCalledOnce();
+    app.setMatch(25);
+    expect(listener).toHaveBeenCalledOnce();
+    app.setMatch();
+    expect(app.matchId()).toBeUndefined();
+    expect(web.url()).toBe(original);
+    expect(app.controller.getState()).toBe(before);
+    expect(listener).toHaveBeenCalledTimes(2);
+    app.controller.undo();
+    expect(web.url()).toBe("/?from=friend");
+    app.dispose();
+  });
+
+  it("preserves the selected match through edits, alias replacement and undo/redo", () => {
+    const web = adapter("/?match=25&from=friend");
+    const app = createBrowserController(web.web, "/");
+    app.controller.update(1, { winner: "home" });
+    const token = encodeScenario(app.controller.getState().scenario);
+    app.rememberShortLink(token, "maple.river.sunny");
+    expect(web.url()).toBe("/s/maple.river.sunny?match=25&from=friend");
+    app.controller.update(2, { winner: "away" });
+    expect(web.url()).toContain("/?match=25&from=friend#predictions=v3.");
+    app.controller.undo();
+    expect(web.url()).toBe("/s/maple.river.sunny?match=25&from=friend");
+    expect(app.matchId()).toBe(25);
+    app.setMatch(2);
+    expect(web.url()).toBe("/s/maple.river.sunny?match=2&from=friend");
+    app.controller.redo();
+    expect(web.url()).toContain("/?match=2&from=friend#predictions=v3.");
+    expect(app.matchId()).toBe(2);
+    app.dispose();
+  });
+
+  it("navigates only the match destination without importing predictions or losing undo and ends its edit group", () => {
+    const web = adapter("/?from=friend");
+    const app = createBrowserController(web.web, "/");
+    app.setMatch(1);
+    app.controller.update(1, { winner: "home" }, "details");
+    const before = app.controller.getState();
+    const token = encodeScenario(before.scenario);
+    const listener = vi.fn();
+    app.subscribe(listener);
+    const writes = web.writes.length;
+    web.navigate(`/?from=friend&match=2#predictions=${token}`);
+    expect(app.matchId()).toBe(2);
+    expect(app.controller.getState()).toBe(before);
+    expect(app.controller.getState().canUndo).toBe(true);
+    expect(web.writes).toHaveLength(writes);
+    expect(listener).toHaveBeenCalledOnce();
+    web.repeatEvent();
+    expect(listener).toHaveBeenCalledOnce();
+    app.controller.update(1, { margin: 5 }, "details");
+    app.controller.undo();
+    expect(app.controller.getState().scenario).toEqual(before.scenario);
+    app.controller.undo();
+    expect(app.controller.getState().scenario.predictions).toEqual({});
+    app.dispose();
+  });
+
+  it("navigates match destinations on a cached alias without resetting prediction history", () => {
+    const web = adapter();
+    const app = createBrowserController(web.web, "/");
+    app.controller.update(1, { winner: "home" });
+    app.rememberShortLink(encodeScenario(app.controller.getState().scenario), "maple.river.sunny");
+    app.setMatch(1);
+    const before = app.controller.getState();
+    const writes = web.writes.length;
+    web.navigate("/s/maple.river.sunny?match=2");
+    expect(app.matchId()).toBe(2);
+    expect(app.controller.getState()).toBe(before);
+    web.navigate("/s/maple.river.sunny");
+    expect(app.matchId()).toBeUndefined();
+    expect(app.controller.getState()).toBe(before);
+    expect(web.writes).toHaveLength(writes);
+    app.controller.undo();
+    expect(web.url()).toBe("/");
+    app.dispose();
+  });
+
+  it("keeps accepted double-slash fragment paths on the same origin when changing match focus", () => {
+    const token = encodeScenario(pick());
+    for (const path of ["//", "//another.example"]) {
+      const web = adapter(`https://predict.example${path}?match=1#predictions=${token}`);
+      const app = createBrowserController(web.web, "/");
+      const before = app.controller.getState();
+      expect(app.urlError()).toBeUndefined();
+      expect(() => web.navigate(`https://predict.example${path}?match=2#predictions=${token}`)).not.toThrow();
+      expect(app.controller.getState()).toBe(before);
+      expect(app.matchId()).toBe(2);
+      app.setMatch(3);
+      expect(web.url()).toBe(`/?match=3#predictions=${token}`);
+      expect(app.controller.getState()).toBe(before);
+      app.dispose();
+    }
+  });
+
+  it.each(["0", "-1", "1.5", "01", "1%0A", "Infinity", "NaN", "999999999999999999999999", "53", "", "1&match=2"])("ignores invalid match destinations without changing a valid prediction link (%s)", (value) => {
+    const url = `/?match=${value}#predictions=${encodeScenario(pick())}`;
+    const web = adapter(url);
+    const app = createBrowserController(web.web, "/");
+    expect(app.matchId()).toBeUndefined();
+    expect(app.urlError()).toBeUndefined();
+    expect(app.controller.getState().scenario).toEqual(pick());
+    expect(web.writes).toEqual([]);
+    expect(web.url()).toBe(url);
+    app.setMatch(2);
+    expect(new URLSearchParams(web.web.readLocation().search).getAll("match")).toEqual(["2"]);
+    app.dispose();
+  });
+
+  it("validates destination IDs against the selected tournament and preserves malformed prediction URLs", () => {
+    const legacy = adapter(`/?match=52#predictions=${encodeScenario(emptyScenario("rwc2023"))}`);
+    const app = createBrowserController(legacy.web, "/");
+    expect(app.matchId()).toBeUndefined();
+    expect(() => app.setMatch(52)).toThrow(/outside the selected tournament/);
+    app.setMatch(48);
+    expect(app.matchId()).toBe(48);
+    app.dispose();
+    const web = adapter("/?match=25#predictions=broken");
+    const invalid = createBrowserController(web.web, "/");
+    expect(invalid.matchId()).toBeUndefined();
+    invalid.setMatch(1);
+    expect(web.writes).toEqual([]);
+    expect(web.url()).toBe("/?match=25#predictions=broken");
+    invalid.dispose();
+  });
+
   it("replaces the current address with its alias without publishing state or changing undo", () => {
     const web = adapter("/?from=friend");
     const app = createBrowserController(web.web, "/");

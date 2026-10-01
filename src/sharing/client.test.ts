@@ -28,7 +28,7 @@ describe("Snapshot sharing without changing predictions", () => {
     const controller = createScenarioController();
     controller.update(1, { winner: "home", homeTries: 0, homeTryBonus: false });
     const original = controller.getState();
-    const snapshot = captureShareSnapshot(original.scenario, "https://predict.example/#predictions=old");
+    const snapshot = captureShareSnapshot(original.scenario, "https://predict.example/?match=1#predictions=old");
     const pending = deferred<Response>();
     const request = vi.fn<typeof fetch>().mockReturnValue(pending.promise);
     const client = createShareClient({ fetch: request });
@@ -37,7 +37,7 @@ describe("Snapshot sharing without changing predictions", () => {
     const edited = controller.getState();
     pending.resolve(response(snapshot.token));
 
-    expect(await sharing).toEqual({ url: "https://predict.example/s/happy.blue.otter", shortUnavailable: false });
+    expect(await sharing).toEqual({ url: "https://predict.example/s/happy.blue.otter?match=1", shortUnavailable: false });
     expect(JSON.parse(request.mock.calls[0][1]!.body as string)).toEqual({ token: encodeScenario(original.scenario) });
     expect(request.mock.calls[0][0]).toBe("/api/shares");
     expect(request.mock.calls[0][1]).toMatchObject({ method: "POST", headers: { "Content-Type": "application/json" } });
@@ -47,21 +47,31 @@ describe("Snapshot sharing without changing predictions", () => {
     expect(controller.getState().scenario).toEqual(original.scenario);
   });
 
-  it("uses canonical full links for legacy paths and preserves configured app roots and queries", () => {
+  it("preserves match queries and legacy identity in full, short and offline links", async () => {
     const controller = createScenarioController(emptyScenario("rwc2023"));
     controller.update(1, { winner: "away" });
-    const snapshot = captureShareSnapshot(controller.getState().scenario, "https://predict.example/tracker/AQH///8=?from=friend", "/tracker/");
-    expect(snapshot.fullUrl).toBe(`https://predict.example/tracker/?from=friend#predictions=${snapshot.token}`);
+    const snapshot = captureShareSnapshot(controller.getState().scenario, "https://predict.example/tracker/AQH///8=?match=1&from=friend", "/tracker/");
+    expect(snapshot.fullUrl).toBe(`https://predict.example/tracker/?match=1&from=friend#predictions=${snapshot.token}`);
     expect(decodeScenario(new URL(snapshot.fullUrl).hash.slice("#predictions=".length))).toEqual(controller.getState().scenario);
     expect(Object.isFrozen(snapshot)).toBe(true);
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response(snapshot.token));
+    expect(await createShareClient({ fetch: request }).getLink(snapshot)).toEqual({
+      url: "https://predict.example/s/happy.blue.otter?match=1&from=friend", shortUnavailable: false,
+    });
+    expect(await createShareClient({ fetch: request, isOnline: () => false }).getLink(snapshot)).toEqual({
+      url: snapshot.fullUrl, shortUnavailable: true,
+    });
+    expect(request).toHaveBeenCalledOnce();
   });
 
   it("copies an empty 2027 app root without creating a short-link record", async () => {
     const request = vi.fn<typeof fetch>();
-    const snapshot = captureShareSnapshot(emptyScenario(), "https://predict.example/?from=friend#predictions=old");
-    expect(await createShareClient({ fetch: request, isOnline: () => false }).getLink(snapshot)).toEqual({
-      url: "https://predict.example/", shortUnavailable: false,
+    const snapshot = captureShareSnapshot(emptyScenario(), "https://predict.example/?match=1&from=friend#predictions=old");
+    const client = createShareClient({ fetch: request, isOnline: () => false });
+    expect(await client.getLink(snapshot)).toEqual({
+      url: "https://predict.example/?match=1&from=friend", shortUnavailable: false,
     });
+    expect(await client.findExistingLink(snapshot)).toBeUndefined();
     expect(request).not.toHaveBeenCalled();
   });
 
@@ -92,6 +102,47 @@ describe("Snapshot sharing without changing predictions", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
+  it("uses one cached alias for the same predictions with different captured match queries", async () => {
+    const scenario = decodeScenario(pickedSnapshot().token);
+    const first = captureShareSnapshot(scenario, "https://predict.example/?match=1");
+    const second = captureShareSnapshot(scenario, "https://predict.example/?match=17&from=friend");
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response(first.token));
+    let online = true;
+    const client = createShareClient({ fetch: request, isOnline: () => online });
+
+    expect(first.token).toBe(second.token);
+    expect(first.fullUrl).toBe(`https://predict.example/?match=1#predictions=${first.token}`);
+    expect(await client.getLink(first)).toEqual({
+      url: "https://predict.example/s/happy.blue.otter?match=1", shortUnavailable: false,
+    });
+    online = false;
+    const secondLink = { url: "https://predict.example/s/happy.blue.otter?match=17&from=friend", shortUnavailable: false };
+    expect(client.cachedLink(second)).toEqual(secondLink);
+    expect(await client.getLink(second)).toEqual(secondLink);
+    expect(await client.findExistingLink(second)).toEqual(secondLink);
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0][0]).toBe("/api/shares");
+    expect(JSON.parse(request.mock.calls[0][1]!.body as string)).toEqual({ token: first.token });
+  });
+
+  it.each([
+    "?match=1&next=https%3A%2F%2Fevil.example%2F%23other&note=%23predictions%3Dv9.evil",
+    "?match=1&note=%0D%0ALocation%3A%20https%3A%2F%2Fevil.example&next=//evil.example",
+  ])("keeps encoded query values as data in full and short links (%s)", async (query) => {
+    const snapshot = captureShareSnapshot(decodeScenario(pickedSnapshot().token), `https://predict.example/${query}#ignored`);
+    const full = new URL(snapshot.fullUrl);
+    expect(full.origin).toBe("https://predict.example");
+    expect(full.search).toBe(query);
+    expect(full.hash).toBe(`#predictions=${snapshot.token}`);
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response(snapshot.token));
+    const link = new URL((await createShareClient({ fetch: request }).getLink(snapshot)).url);
+    expect(link.origin).toBe(full.origin);
+    expect(link.pathname).toBe("/s/happy.blue.otter");
+    expect(link.search).toBe(query);
+    expect(link.hash).toBe("");
+    expect(link.href).not.toMatch(/[\r\n]/);
+  });
+
   it("falls back immediately offline, without changing the captured state", async () => {
     const snapshot = pickedSnapshot();
     const request = vi.fn<typeof fetch>();
@@ -107,7 +158,7 @@ describe("Snapshot sharing without changing predictions", () => {
     const request = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError("Network unavailable.")).mockResolvedValueOnce(response(snapshot.token));
     const client = createShareClient({ fetch: request });
     expect(await client.getLink(snapshot)).toEqual({ url: snapshot.fullUrl, shortUnavailable: true });
-    expect(await client.getLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter", shortUnavailable: false });
+    expect(await client.getLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter?from=friend", shortUnavailable: false });
     expect(request).toHaveBeenCalledTimes(2);
   });
 
@@ -123,7 +174,7 @@ describe("Snapshot sharing without changing predictions", () => {
     expect(request.mock.calls[0][1]!.signal!.aborted).toBe(true);
     pending.resolve(response(snapshot.token));
     await Promise.resolve();
-    expect(await client.getLink(snapshot)).toEqual({ url: "https://predict.example/s/sunny.green.panda", shortUnavailable: false });
+    expect(await client.getLink(snapshot)).toEqual({ url: "https://predict.example/s/sunny.green.panda?from=friend", shortUnavailable: false });
     expect(request).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -180,7 +231,7 @@ describe("Read-only existing snapshot lookup", () => {
     const client = createShareClient({ fetch: request });
     expect(client.cachedLink(snapshot)).toBeUndefined();
     const link = await client.findExistingLink(snapshot);
-    expect(link).toEqual({ url: "https://predict.example/s/happy.blue.otter", shortUnavailable: false });
+    expect(link).toEqual({ url: "https://predict.example/s/happy.blue.otter?from=friend", shortUnavailable: false });
     const url = new URL(request.mock.calls[0][0] as string, snapshot.fullUrl);
     expect(url.pathname).toBe("/api/shares");
     expect([...url.searchParams]).toEqual([["fingerprint", createHash("sha256").update(snapshot.token).digest("hex")]]);
@@ -192,18 +243,22 @@ describe("Read-only existing snapshot lookup", () => {
     expect(decodeScenario(snapshot.token)).toEqual(before);
   });
 
-  it("coalesces concurrent uncancelled lookups of identical state", async () => {
+  it("coalesces concurrent lookups of identical state while preserving each match query", async () => {
     const snapshot = pickedSnapshot();
+    const matchSnapshot = captureShareSnapshot(decodeScenario(snapshot.token), "https://predict.example/?match=17");
     const requested = deferred<void>();
     const pending = deferred<Response>();
     const request = vi.fn<typeof fetch>().mockImplementation(() => { requested.resolve(undefined); return pending.promise; });
     const client = createShareClient({ fetch: request });
     const first = client.findExistingLink(snapshot);
-    const second = client.findExistingLink(snapshot);
+    const second = client.findExistingLink(matchSnapshot);
     await requested.promise;
     expect(request).toHaveBeenCalledOnce();
     pending.resolve(response(snapshot.token));
-    expect(await first).toEqual(await second);
+    expect(await first).toEqual({ url: "https://predict.example/s/happy.blue.otter?from=friend", shortUnavailable: false });
+    expect(await second).toEqual({ url: "https://predict.example/s/happy.blue.otter?match=17", shortUnavailable: false });
+    const url = new URL(request.mock.calls[0][0] as string, snapshot.fullUrl);
+    expect([...url.searchParams]).toEqual([["fingerprint", createHash("sha256").update(snapshot.token).digest("hex")]]);
     expect(request).toHaveBeenCalledOnce();
   });
 
@@ -213,7 +268,7 @@ describe("Read-only existing snapshot lookup", () => {
     const client = createShareClient({ fetch: request });
     expect(await client.findExistingLink(snapshot)).toBeUndefined();
     expect(client.cachedLink(snapshot)).toBeUndefined();
-    expect(await client.findExistingLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter", shortUnavailable: false });
+    expect(await client.findExistingLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter?from=friend", shortUnavailable: false });
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
   });
@@ -223,7 +278,7 @@ describe("Read-only existing snapshot lookup", () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, { status: 404 })).mockResolvedValueOnce(response(snapshot.token));
     const client = createShareClient({ fetch: request });
     expect(await client.findExistingLink(snapshot)).toBeUndefined();
-    expect(await client.getLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter", shortUnavailable: false });
+    expect(await client.getLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter?from=friend", shortUnavailable: false });
     expect(request.mock.calls.map(([, init]) => init?.method)).toEqual(["GET", "POST"]);
   });
 
@@ -296,7 +351,7 @@ describe("Read-only existing snapshot lookup", () => {
     expect(await client.findExistingLink(snapshot)).toBeUndefined();
     expect(await client.findExistingLink(snapshot)).toBeUndefined();
     expect(client.cachedLink(snapshot)).toBeUndefined();
-    expect(await client.findExistingLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter", shortUnavailable: false });
+    expect(await client.findExistingLink(snapshot)).toEqual({ url: "https://predict.example/s/happy.blue.otter?from=friend", shortUnavailable: false });
     expect(request.mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
   });
 
@@ -341,10 +396,10 @@ describe("Read-only existing snapshot lookup", () => {
     expect(await first).toBeUndefined();
     expect(request.mock.calls[1][1]!.signal!.aborted).toBe(false);
     secondResponse.resolve(response(snapshot.token, "sunny.green.panda"));
-    expect(await second).toEqual({ url: "https://predict.example/s/sunny.green.panda", shortUnavailable: false });
+    expect(await second).toEqual({ url: "https://predict.example/s/sunny.green.panda?from=friend", shortUnavailable: false });
     firstResponse.resolve(response(snapshot.token));
     await Promise.resolve();
-    expect(client.cachedLink(snapshot)).toEqual({ url: "https://predict.example/s/sunny.green.panda", shortUnavailable: false });
+    expect(client.cachedLink(snapshot)).toEqual({ url: "https://predict.example/s/sunny.green.panda?from=friend", shortUnavailable: false });
   });
 
   it("times out a transport that ignores abort, discards late success and retries", async () => {
@@ -363,7 +418,7 @@ describe("Read-only existing snapshot lookup", () => {
     pending.resolve(response(snapshot.token));
     await Promise.resolve();
     expect(client.cachedLink(snapshot)).toBeUndefined();
-    expect(await client.findExistingLink(snapshot)).toEqual({ url: "https://predict.example/s/sunny.green.panda", shortUnavailable: false });
+    expect(await client.findExistingLink(snapshot)).toEqual({ url: "https://predict.example/s/sunny.green.panda?from=friend", shortUnavailable: false });
     expect(request).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
   });

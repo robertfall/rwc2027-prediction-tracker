@@ -4,6 +4,8 @@ A lightweight predictor for the 2027 Rugby World Cup. Pick winners across six po
 
 Browse pools by pool or timeline, then unlock knockout rounds, timeline and bracket views once every pool result is valid. Standings sit beside matches on desktop and stack on mobile. View and filter changes leave predictions and the URL untouched. Details edits apply immediately as one undoable session; **Clear pick** is a separate action. [Design reference](docs/design/README.md)
 
+Opening **Details** adds `?match=25` (for match 25) to the URL. Share from the dialog's **Copy match link** control to open that game in a fresh browser, including its current predictions. Full and three-word links retain this destination; closing removes it without changing predictions or undo. [Match links](docs/match-links.md)
+
 Shared links use sparse v3 bit-packing: one shallow winner takes a nine-character token and 52 winner/advancement choices take 129; older links remain readable. Generated scores and tries use the existing saved-outcome encoding. [Prediction-link format](docs/prediction-links.md)
 
 The built-in shortener stores that exact token in Cloudflare D1, deduplicates identical predictions and resolves `/s/maple.river.sunny` back to the full scenario. Sharing replaces the address bar with the short URL when its snapshot is still current. A quiet background lookup also reuses already-shared states; edits stay instant and undo restores known aliases locally. Older shared snapshots stay unchanged. [Short-link contract](docs/short-links.md)

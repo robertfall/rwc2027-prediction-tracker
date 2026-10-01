@@ -1,4 +1,4 @@
-import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { createBrowserController } from "./state/browser";
 import { rankingSnapshot } from "./domain/rankings";
 import { planRankingFill } from "./domain/ranking-fill";
@@ -19,35 +19,57 @@ function App() {
     },
   });
   const controller = browser.controller;
+  const initialMatch = controller.getState().derived.fixtures.find((fixture) => fixture.id === browser.matchId());
   const [state, setState] = createSignal(controller.getState());
   const [urlError, setUrlError] = createSignal(browser.urlError());
-  const [phase, setPhase] = createSignal<"pools" | "knockout">("pools");
+  const [phase, setPhase] = createSignal<"pools" | "knockout">(initialMatch && initialMatch.stage !== "pool" && controller.getState().derived.poolsComplete ? "knockout" : "pools");
   const [poolView, setPoolView] = createSignal<"pool" | "timeline">("pool");
   const [knockoutView, setKnockoutView] = createSignal<"rounds" | "timeline" | "bracket">("rounds");
   const [poolFilter, setPoolFilter] = createSignal("all");
-  const [activeFixtureId, setActiveFixtureId] = createSignal<number>();
+  const [activeFixtureId, setActiveFixtureId] = createSignal<number | undefined>(browser.urlError() ? undefined : initialMatch?.id);
   const [copyStatus, setCopyStatus] = createSignal("");
   const [manualUrl, setManualUrl] = createSignal("");
   const [sharing, setSharing] = createSignal(false);
   let disposed = false;
   let detailTrigger: HTMLElement | undefined;
+  let detailTriggerId: number | undefined;
   let loadedTournament = controller.getState().scenario.tournamentId;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
-  const closeDetails = () => { controller.finishGroup(); setActiveFixtureId(undefined); };
+  const closeDetails = () => { controller.finishGroup(); browser.setMatch(); };
   const openDetails = (id: number, trigger: HTMLButtonElement) => {
     if (urlError()) return;
-    controller.finishGroup(); detailTrigger = trigger; setActiveFixtureId(id);
+    controller.finishGroup(); detailTrigger = trigger; detailTriggerId = id; browser.setMatch(id);
   };
-  const unsubscribe = browser.subscribe(() => {
+  const detailReturnTarget = (id: number): HTMLElement | undefined => {
+    const visible = (element: HTMLElement | undefined | null) => Boolean(element?.isConnected && element.getClientRects().length && !element.matches(":disabled"));
+    if (detailTriggerId === id && visible(detailTrigger)) return detailTrigger;
+    const trigger = document.querySelector<HTMLButtonElement>(`[data-fixture-id="${id}"] button[aria-haspopup="dialog"]:not(:disabled)`);
+    if (visible(trigger)) return trigger!;
+    return document.querySelector<HTMLButtonElement>(".view-nav button[aria-pressed=true]") ?? undefined;
+  };
+  const unsubscribe = browser.subscribe(() => untrack(() => {
     const next = controller.getState();
-    if (browser.urlError() || next.scenario.tournamentId !== loadedTournament) {
-      closeDetails(); setPoolFilter("all");
+    const changedTournament = next.scenario.tournamentId !== loadedTournament;
+    const matchId = browser.urlError() ? undefined : browser.matchId();
+    if (browser.urlError() || changedTournament) {
+      // Route changes dismiss the old dialog without clearing the newly addressed match.
+      setActiveFixtureId(undefined); setPoolFilter("all");
+      detailTrigger = undefined; detailTriggerId = undefined;
     }
+    if (activeFixtureId() !== matchId) controller.finishGroup();
+    if (detailTriggerId !== matchId) { detailTrigger = undefined; detailTriggerId = undefined; }
     loadedTournament = next.scenario.tournamentId;
     setState(next); setUrlError(browser.urlError());
+    const match = next.derived.fixtures.find((fixture) => fixture.id === matchId);
+    if (match) {
+      setPhase(match.stage !== "pool" && next.derived.poolsComplete ? "knockout" : "pools");
+      if (match.stage === "pool" && poolFilter() !== "all" && poolFilter() !== match.pool) setPoolFilter(match.pool ?? "all");
+    }
+    // A stable fixture ID keeps live editing mounted through prediction and alias changes.
+    setActiveFixtureId(match?.id);
     setManualUrl(""); setCopyStatus("");
     if (copyTimer) clearTimeout(copyTimer);
-  });
+  }));
   const keyboard = (event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
     if (urlError() || target?.closest("input, textarea, select, [contenteditable=true]") || !(event.ctrlKey || event.metaKey) || event.altKey) return;
@@ -192,7 +214,9 @@ function App() {
       </footer>
     </main>
     <div classList={{ "share-status": true, "share-status--visible": Boolean(copyStatus()) }} role="status">{copyStatus()}</div>
-    <Show when={activeFixtureId()} keyed>{(id) => <MatchDetailsDialog fixture={fixtureById().get(id)!} controller={controller} onClose={closeDetails} returnFocus={detailTrigger} />}</Show>
+    <Show when={activeFixtureId()} keyed>{(id) => <MatchDetailsDialog fixture={fixtureById().get(id)!} controller={controller} onClose={closeDetails}
+      returnFocus={() => detailReturnTarget(id)} onCopyLink={copyLink} sharing={sharing()} copyDisabled={Boolean(urlError())}
+      copyStatus={copyStatus()} manualUrl={manualUrl()} />}</Show>
   </div>;
 }
 

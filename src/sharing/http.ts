@@ -102,8 +102,8 @@ export async function handleShareRequest(request: Request, db?: SharingDatabase,
     const snapshot = await readSharedSnapshot(db, alias);
     if (!snapshot) return apiLookup ? error("Prediction link not found.", 404, head) : missingSnapshot(head);
     if (apiLookup) return json(snapshot, 200, snapshotCache, head);
-    // The canonical v3 alphabet cannot inject a URL delimiter or another origin.
-    return new Response(null, { status: 302, headers: { ...snapshotCache, Location: `/#predictions=${snapshot.token}` } });
+    // Parsed search stays query data; the relative path and canonical token fix the origin and fragment.
+    return new Response(null, { status: 302, headers: { ...snapshotCache, Location: `/${url.search}#predictions=${snapshot.token}` } });
   } catch (cause) {
     if (cause instanceof ShareInputError) return error(cause.message, cause.status, head);
     return error("Short sharing is unavailable. Use the full prediction link.", 503, head);

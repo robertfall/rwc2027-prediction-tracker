@@ -181,6 +181,7 @@
 .match-dialog-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
 .match-dialog-title { font-size: 20px; line-height: 1.2; font-weight: 700; }
 .match-dialog-meta { margin-top: 4px; color: var(--color-muted); font-size: 13px; }
+.match-dialog-waiting { margin-block: 12px; color: var(--color-muted); font-size: 13px; line-height: 1.4; }
 .match-dialog-close { margin: -8px -8px 0 0; }
 .match-dialog-preview { display: flex; align-items: baseline; gap: 12px; margin-block: 12px 16px; color: var(--color-muted); font-size: 14px; }
 .match-dialog-preview strong { color: var(--color-ink); font: 700 28px/1 var(--font-display); }
@@ -231,6 +232,9 @@
 .detail-clear:disabled { color: var(--color-border-strong); }
 .detail-done { background: var(--color-eucalyptus); color: white; }
 .detail-done:hover { background: var(--color-eucalyptus-hover); }
+.match-dialog-copy { width: 44px; min-height: 44px; border-radius: 8px; }
+.match-dialog-share-status:not(:empty) { margin-top: 8px; color: var(--color-eucalyptus); font-size: 13px; }
+.match-dialog-manual-link { margin-block: 12px 0; }
 .match-dialog-venue { margin-top: 8px; color: var(--color-muted); font-size: 11px; line-height: 1.4; }
 .app-footer { margin-top: 48px; border-top: 1px solid var(--color-border-subtle); padding: 16px 0 32px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 1.5; color: var(--color-muted); }
 .rules-details > summary { cursor: pointer; color: var(--color-eucalyptus); font-weight: 600; }

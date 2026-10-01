@@ -62,14 +62,15 @@ test("winner-first edits, grouped undo and links replay in a fresh browser", asy
   await details(page, 1);
   await expect(margin).toHaveValue("15");
   await expect(dialog(page).locator("#match-1-homeTries")).toHaveValue("4");
-  const savedUrl = page.url();
-  expect(savedUrl).toContain("#predictions=v3.");
+  const focusedUrl = page.url();
+  expect(focusedUrl).toContain("#predictions=v3.");
   expect(await page.evaluate(() => history.length)).toBe(initialHistory);
   await dialog(page).locator("#match-1-homeScore").fill("256");
   await expect(dialog(page).locator("#match-1-homeScore")).toHaveAttribute("aria-invalid", "true");
-  expect(page.url()).toBe(savedUrl);
+  expect(page.url()).toBe(focusedUrl);
   await dialog(page).locator("#match-1-homeScore").fill("");
   await done(page);
+  const savedUrl = page.url();
   const fresh = await browser.newContext();
   const shared = await fresh.newPage();
   await shared.goto(savedUrl);

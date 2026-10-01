@@ -4,6 +4,8 @@ Full prediction URLs use `#predictions=v3.<base64url>`: a sparse bit-packed toke
 
 **Copy link** stores the captured canonical token as an immutable public D1 snapshot, copies a short `/s/three.word.alias` URL and replaces the address bar if that snapshot is still current. The service deduplicates identical tokens and redirects aliases into this same fragment reader. A debounced read-only fingerprint lookup reuses already-shared states, with cached aliases restored locally on undo/redo. Schema/profile versions, pinned outcomes and old readers remain unchanged. The full URL is the offline/service-error fallback. [Short-link service](short-links.md)
 
+The optional `?match=<fixture ID>` query opens that game's Details dialog. It is preserved through full/short sharing and redirects but stays outside the prediction token, fingerprint and alias identity. Opening, closing and match-only navigation never add a prediction undo entry. [Match destinations](match-links.md)
+
 `src/state/codec.ts` validates scenarios and selects readers. `src/state/compact-codec.ts` defines v3. The in-memory scenario schema remains version 2; transport version 3 changes its representation.
 
 | Profile byte | Permanent inputs |

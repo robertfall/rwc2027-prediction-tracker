@@ -13,7 +13,7 @@
 ## Repository map
 
 - `src/domain/`: plain TypeScript tournament definitions, completion, standings and bracket derivation. `ranking-fill.ts` plans updates using `rankings.ts`/`ranking-data.ts`; `reconcile.ts` handles participant changes and dormant pins. `types.ts` defines shared contracts; `tournaments.ts` selects 2027 or legacy 2023.
-- `src/state/controller.ts`: immutable snapshots, generic `applyBatch`, atomic actions, grouped edits and undo/redo. `codec.ts` validates/dispatches links; `compact-codec.ts` writes sparse v3 bits; `browser.ts` alone reads/writes prediction URLs.
+- `src/state/controller.ts`: immutable snapshots, generic `applyBatch`, atomic actions, grouped edits and undo/redo. `codec.ts` validates/dispatches links; `compact-codec.ts` writes sparse v3 bits; `browser.ts` alone reads/writes prediction URLs and the `?match=` destination.
 - `src/App.tsx` and `src/components/`: Solid pool/timeline/rounds/bracket views, standings and the shared Details dialog, with plain CSS. `main.tsx` mounts the app. Keep domain calculations independent of Solid.
 - `src/services/results/{compression,model}.ts` and `src/data/`: retained 2023 compatibility. Pure legacy scoring tests remain under `src/services/logs/`.
 - `src/sharing/`: immutable D1 snapshots, fingerprint/alias lookup, reviewed alias words, bounded HTTP routes and the browser share client. `migrations/` holds additive schema changes.
@@ -31,7 +31,7 @@
 - Gate Knockout until every pool fixture has a valid completed result. Qualification markers use the same derived state, including best thirds; bracket connectors follow fixture sources, never match-number adjacency.
 - Bind knockout choices to participants. Clear incompatible picks when known teams change, as part of the same undo action; retain dormant picks while earlier results are temporarily unresolved.
 - Details edits apply live and share one undo entry across the whole dialog session. Closing ends the group without reverting; Clear pick is a separate undoable action. Keep inferred suggestions distinct from explicit choices.
-- New actions clear redo. Browser navigation imports the addressed scenario and resets session history; browser Back/Forward as prediction undo remains a follow-up. Edits replace the prediction URL; phase, layout, filter and scroll stay local and out of shared links.
+- New actions clear redo. Scenario navigation imports predictions and resets session history; match-only navigation changes the dialog and ends its field group without resetting undo. `?match=<fixture ID>` opens Details, survives full/short sharing and clears on close. Ignore invalid IDs; unresolved knockout details remain read-only. Match focus stays outside tokens/fingerprints. Browser Back/Forward as prediction undo remains a follow-up; phase, layout, filter and scroll stay local. [Match links](docs/match-links.md)
 - Preserve malformed URLs until explicit recovery. URLs carry current scenario data, never the undo stack. Keep payloads/decompression bounded and reject unknown versions, duplicate IDs, noncanonical tails and invalid saved outcomes.
 - Use official tournament sources. Current 2027 rules/ranking fallback are explicitly provisional; change their versions and documentation when final regulations arrive.
 - Add TanStack tools only for a concrete need. Future methods are Consensus, Rugby model and Bookmakers, using immutable permitted snapshots loaded outside edits. Prefer free sources within a combined US$50/month budget; provider integration follows this milestone.

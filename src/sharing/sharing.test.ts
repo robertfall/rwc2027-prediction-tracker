@@ -192,6 +192,68 @@ describe("Sharing HTTP routes", () => {
     }
   });
 
+  it("preserves each match query in redirects while sharing one immutable prediction identity", async () => {
+    const token = changedToken();
+    const queries = ["?match=1", "?match=17&from=friend"];
+    let saved: { alias: string; token: string } | undefined;
+    for (const query of queries) {
+      const created = await handleShareRequest(new Request(`${origin}/api/shares${query}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+      }), db);
+      expect(created!.status).toBe(200);
+      const snapshot = await created!.json() as { alias: string; token: string };
+      if (!saved) saved = snapshot;
+      expect(snapshot).toEqual(saved);
+      expect(snapshot.token).toBe(token);
+      for (const method of ["GET", "HEAD"]) {
+        const redirect = await handleShareRequest(new Request(`${origin}/s/${snapshot.alias}${query}`, { method }), db);
+        expect(redirect!.status).toBe(302);
+        expect(redirect!.headers.get("Location")).toBe(`/${query}#predictions=${token}`);
+        const target = new URL(redirect!.headers.get("Location")!, origin);
+        expect(target.origin).toBe(origin);
+        expect(target.search).toBe(query);
+        expect(decodeScenario(target.hash.slice("#predictions=".length))).toEqual(decodeScenario(token));
+        expect(await redirect!.text()).toBe("");
+      }
+    }
+    expect(await readSharedSnapshot(db, saved!.alias)).toEqual(saved);
+    expect(await readSharedSnapshotByFingerprint(db, await fingerprintShareToken(token))).toEqual(saved);
+    expect(db.count()).toBe(1);
+  });
+
+  it.each([
+    "?match=1&next=https%3A%2F%2Fevil.example%2F%23other&note=%23predictions%3Dv9.evil",
+    "?match=1&note=%0D%0ALocation%3A%20https%3A%2F%2Fevil.example&next=//evil.example",
+  ])("keeps encoded query values from overriding the redirect origin or fragment (%s)", async (query) => {
+    const saved = await createSharedSnapshot(db, changedToken(), () => aliasA);
+    const redirect = await handleShareRequest(new Request(`${origin}/s/${saved.alias}${query}#ignored`), db);
+    expect(redirect!.status).toBe(302);
+    const location = redirect!.headers.get("Location")!;
+    expect(location).toBe(`/${query}#predictions=${saved.token}`);
+    expect(location).not.toMatch(/[\r\n]/);
+    const target = new URL(location, origin);
+    expect(target.origin).toBe(origin);
+    expect(target.pathname).toBe("/");
+    expect(target.search).toBe(query);
+    expect(target.hash).toBe(`#predictions=${saved.token}`);
+    expect(await readSharedSnapshot(db, saved.alias)).toEqual(saved);
+    expect(db.count()).toBe(1);
+  });
+
+  it("preserves a match query while redirecting a legacy scenario to its canonical 2023 token", async () => {
+    const legacy = encodeLegacyVersion([{ matchNumber: 1, touched: true, homeScore: 31, awayScore: 24, homeTries: 4, awayTries: 2 }]);
+    const created = await handleShareRequest(post({ token: legacy }), db);
+    const saved = await created!.json() as { alias: string; token: string };
+    expect(saved.token).toBe(canonicalShareToken(legacy));
+    const redirect = await handleShareRequest(new Request(`${origin}/s/${saved.alias}?match=1`), db);
+    expect(redirect!.headers.get("Location")).toBe(`/?match=1#predictions=${saved.token}`);
+    const target = new URL(redirect!.headers.get("Location")!, origin);
+    const scenario = decodeScenario(target.hash.slice("#predictions=".length));
+    expect(scenario).toEqual(decodeScenario(legacy));
+    expect(scenario.tournamentId).toBe("rwc2023");
+    expect(db.count()).toBe(1);
+  });
+
   it.each([{}, { token: changedToken(), extra: true }, { token: null }, [], "token"])("rejects unknown/invalid JSON fields (%j)", async (body) => {
     const result = await handleShareRequest(post(body), db);
     expect(result!.status).toBe(400);
@@ -265,7 +327,8 @@ describe("Sharing HTTP routes", () => {
     "", "?fingerprint=", "?fingerprint=invalid", `?fingerprint=${"a".repeat(63)}`,
     `?fingerprint=${"A".repeat(64)}`, `?fingerprint=${"g".repeat(64)}`, `?fingerprint=${"a".repeat(65)}`,
     `?fingerprint=${"a".repeat(64)}%0A`,
-    `?fingerprint=${"a".repeat(64)}&extra=true`, `?fingerprint=${"a".repeat(64)}&fingerprint=${"b".repeat(64)}`,
+    `?fingerprint=${"a".repeat(64)}&extra=true`, `?fingerprint=${"a".repeat(64)}&match=1`,
+    `?fingerprint=${"a".repeat(64)}&fingerprint=${"b".repeat(64)}`,
     `?token=${changedToken()}`,
   ])("rejects missing, malformed, duplicate or unknown lookup parameters (%s)", async (query) => {
     for (const method of ["GET", "HEAD"]) {

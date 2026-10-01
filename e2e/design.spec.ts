@@ -320,7 +320,8 @@ test("opening details keeps a match unpicked; an explicit zero and Clear pick ar
   await expect(dialog(page)).not.toBeVisible();
   await expect(card(page, 1).locator(".result-preview strong")).toHaveCount(0);
   await undo(page).click();
-  expect(page.url()).toBe(editedUrl);
+  expect(new URL(page.url()).hash).toBe(new URL(editedUrl).hash);
+  expect(new URL(page.url()).searchParams.has("match")).toBe(false);
   await openDetails(page, 1);
   await expect(dialog(page).locator("#match-1-homeTries")).toHaveValue("0");
   await expect(dialog(page).locator("#match-1-margin")).toHaveValue("15");

@@ -49,6 +49,14 @@ The Worker has bounded creation/lookup routes and a small reviewed vocabulary; l
 
 Verification passes both TypeScript compilers, lint, **343 unit/property tests**, production build, Cloudflare dry run and all **37 browser/hosting journeys** against local Workers/D1. Checks include read-only alias discovery, address replacement, refresh, cached undo/navigation, stale responses and conflicting fragment recovery. Native clipboard writing starts during the click with a promised payload to preserve Safari's gesture requirement. The production D1 database and initial schema are provisioned; publishing applies migrations first and verifies the live hostname afterward.
 
+The short-link release at `20ca470` was published on 1 October 2026 through the existing Cloudflare recovery login. All **37 production journeys** passed and the live JavaScript/CSS matched the build. Worker version: `8c84f0d0-3cd6-43aa-a198-b2b0a830e265`.
+
+### Match destinations
+
+Opening Details writes `?match=<fixture ID>` outside the prediction token. Full/short sharing, cached aliases and Worker redirects preserve that query without changing snapshot identity. The dialog's copy control shares the clicked prediction and game together, with accessible status/manual fallback inside the modal. Closing clears only the destination; live edits keep one undo group. Match-only navigation preserves undo, while a new scenario still starts a fresh session. Unresolved knockout destinations show a safe waiting dialog and cannot change predictions. [Match-link contract](match-links.md)
+
+Verification passes both TypeScript compilers, lint, **369 unit/property tests**, build and all **46 local browser/hosting journeys**. New journeys cover empty/picked/legacy/full/short destinations, grouped edits, close paths, clipboard fallback, mobile/focus, alias lookup, match navigation and ready/unresolved/dormant knockout states. Codecs and sparse token budgets remain unchanged.
+
 ### Sparse link restoration (before the ranking engine)
 
 The current v3 writer stores only changed fixture records. An immutable profile byte pins tournament, dataset, rules, ranking inputs, completion and team-index order; common winner/advancement choices use a two-bit shortcut. Deeper choices keep field presence, including explicit zero/false and contradictions. Exact default pins reconstruct only under that retained profile; custom resolved outcomes and dormant participant bindings remain explicit. One browser URL writer and all previous readers are retained.

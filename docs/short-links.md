@@ -45,6 +45,8 @@ If storage, the network or the response is unavailable, the client copies the ca
 
 Opening or refreshing a short link retrieves the saved token through the Worker redirect; the initial lookup restores its short address. Generic static/Vite hosting can continue to edit and share full links. Use the Workers preview to exercise actual short links. Open Graph currently uses the existing static image; the stored snapshot makes state-specific image generation possible in a later change.
 
+Full URLs, short URLs, cached links and Worker redirects preserve the captured query string, including `?match=25`. That destination opens the match's Details dialog without changing token/fingerprint/alias identity; different matches in the same prediction reuse one alias. Empty 2027 scenarios can share a match destination at the root without allocating a record. [Match-link contract](match-links.md)
+
 ## Storage and deployment
 
 `wrangler.jsonc` binds `SHARES` to `rwc2027-shares`; migrations live in `migrations/`. The database identifier is public configuration, not a credential. Local state stays under ignored `.wrangler/`.
@@ -67,3 +69,5 @@ References: [Worker bindings](https://developers.cloudflare.com/d1/worker-api/),
 ## Verification
 
 Both TypeScript compilers, lint, all 343 unit/property tests, the production build and Cloudflare deployment dry run pass. All 37 browser journeys pass against local Workers/D1, including duplicate shares, fresh-browser replay, automatic read-only lookup, address replacement and refresh, custom/conflicting/dormant predictions, edits during sharing, stale responses, native clipboard ordering, offline fallback, cached alias navigation and conflicting fragment recovery. The production database and initial schema are provisioned. Release applies migrations before publishing the Worker, then runs these browser journeys against the live hostname.
+
+That release (`20ca470`) also passed all 37 journeys against production on 1 October 2026. Match-query preservation adds coverage in the 369-test combined check and 46-browser-journey suite; see [match destinations](match-links.md).

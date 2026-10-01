@@ -11,6 +11,8 @@ export interface BrowserAdapter {
 export interface BrowserController {
   controller: ScenarioController;
   urlError: () => string | undefined;
+  matchId: () => number | undefined;
+  setMatch: (id?: number) => void;
   rememberShortLink: (token: string, alias: string) => boolean;
   recover: () => void;
   subscribe: (listener: () => void) => () => void;
@@ -31,7 +33,7 @@ const nativeBrowser: BrowserAdapter = {
   },
 };
 
-/** The sole URL writer. Browser navigation imports a scenario and starts a new undo session. */
+/** The sole URL writer. Scenario navigation starts a new undo session; match focus does not. */
 export function createBrowserController(adapter: BrowserAdapter = nativeBrowser, basePath = import.meta.env.BASE_URL, sharing?: BrowserSharing): BrowserController {
   let error: string | undefined;
   let importing = false;
@@ -45,6 +47,24 @@ export function createBrowserController(adapter: BrowserAdapter = nativeBrowser,
   const listeners = new Set<() => void>();
   const key = (location: BrowserLocation) => `${location.pathname}${location.search}${location.hash}`;
   const validAlias = (alias: string) => alias.length < 64 && /^[a-z]+(?:\.[a-z]+){2}$/.exec(alias)?.[0] === alias;
+  const notify = () => { for (const listener of listeners) listener(); };
+
+  function matchId(): number | undefined {
+    if (error) return undefined;
+    const values = new URLSearchParams(adapter.readLocation().search).getAll("match");
+    if (values.length !== 1 || /^[1-9][0-9]*$/.exec(values[0])?.[0] !== values[0]) return undefined;
+    const id = Number(values[0]);
+    return controller.getState().derived.fixtures.some((fixture) => fixture.id === id) ? id : undefined;
+  }
+
+  function onlyMatchChanged(before: string, after: string): boolean {
+    // Prefix the fixed origin so a double-slash path stays a path, not an authority.
+    const previous = new URL(`https://prediction.invalid${before}`);
+    const next = new URL(`https://prediction.invalid${after}`);
+    previous.searchParams.delete("match");
+    next.searchParams.delete("match");
+    return previous.href === next.href;
+  }
 
   function read(): Scenario {
     const location = adapter.readLocation();
@@ -130,12 +150,20 @@ export function createBrowserController(adapter: BrowserAdapter = nativeBrowser,
       lastLocation = key(adapter.readLocation());
     }
     scheduleLookup();
-    for (const listener of listeners) listener();
+    notify();
   });
   scheduleLookup();
   const stopNavigation = adapter.listen(() => {
     if (key(adapter.readLocation()) === lastLocation) return;
+    const previous = lastLocation;
+    const previousError = error;
     const scenario = read();
+    if (!previousError && !error && onlyMatchChanged(previous, lastLocation) && encodeScenario(scenario) === currentToken) {
+      controller.finishGroup();
+      scheduleLookup();
+      notify();
+      return;
+    }
     importing = true;
     try { controller.importScenario(scenario); } finally { importing = false; }
   });
@@ -143,6 +171,25 @@ export function createBrowserController(adapter: BrowserAdapter = nativeBrowser,
   return {
     controller,
     urlError: () => error,
+    matchId,
+    setMatch: (id) => {
+      if (disposed || error) return;
+      if (id !== undefined && !controller.getState().derived.fixtures.some((fixture) => fixture.id === id)) {
+        throw new RangeError("This match is outside the selected tournament.");
+      }
+      const location = adapter.readLocation();
+      const search = new URLSearchParams(location.search);
+      if (id === undefined) search.delete("match");
+      else search.set("match", String(id));
+      const query = search.toString();
+      const path = location.pathname.startsWith("//") ? appPath : location.pathname;
+      const url = `${path}${query ? `?${query}` : ""}${location.hash}`;
+      if (url === key(location)) return;
+      adapter.replaceUrl(url);
+      lastLocation = key(adapter.readLocation());
+      scheduleLookup();
+      notify();
+    },
     rememberShortLink,
     recover: () => {
       error = undefined;
