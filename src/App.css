@@ -408,6 +408,15 @@
   .help-dialog-note { margin-top: 20px; }
   .help-dialog-actions { padding-inline: 16px; }
 }
-@media (max-width: 359px) {
-  .view-nav .stage-number { display: none; }
+@media (max-width: 399px) {
+  .toolbar-main, .toolbar-views-inner, .app-main { padding-inline: 12px; }
+  .toolbar-main { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 4px; }
+  .wordmark { grid-column: 1 / -1; grid-row: 1; }
+  .toolbar-actions { grid-column: 1 / -1; grid-row: 2; position: relative; width: 100%; min-width: 0; margin-left: 0; padding-right: 48px; gap: 4px; }
+  .history-actions .icon-button { flex: none; width: 44px; }
+  .help-button { grid-column: 2; grid-row: 2; position: relative; z-index: 1; }
+  .view-nav { grid-column: 1 / -1; grid-row: 3; }
+  .share-menu { margin-left: auto; }
+  .share-menu, .settings-menu { position: static; }
+  .share-popover, .settings-popover { max-width: 100%; }
 }

@@ -146,16 +146,19 @@ test("help fits a 320px header and keeps its scrollable content and dismissal co
   await expect(stages.getByRole("button", { name: /\bPools\b/ })).toContainText("36/36");
   await expect(knockout).toContainText("16/16");
   await expect(knockout).toHaveAttribute("aria-disabled", "false");
-  const [unlockedHelp, unlockedStages, unlockedKnockout] = await Promise.all([
+  const [unlockedHelp, unlockedStages, unlockedKnockout, unlockedShare] = await Promise.all([
     help(page).boundingBox(), stages.boundingBox(), knockout.boundingBox(),
+    page.getByRole("button", { name: "Share", exact: true }).boundingBox(),
   ]);
-  if (!unlockedHelp || !unlockedStages || !unlockedKnockout) throw new Error("Unlocked stages and help must remain visible.");
+  if (!unlockedHelp || !unlockedStages || !unlockedKnockout || !unlockedShare) throw new Error("Unlocked stages and header actions must remain visible.");
   expect(unlockedHelp.width).toBeGreaterThanOrEqual(44);
   expect(unlockedHelp.height).toBeGreaterThanOrEqual(44);
   expect(unlockedHelp.x).toBeGreaterThanOrEqual(0);
   expect(unlockedHelp.x + unlockedHelp.width).toBeLessThanOrEqual(320);
-  expect(Math.abs(unlockedStages.y + unlockedStages.height / 2 - (unlockedHelp.y + unlockedHelp.height / 2))).toBeLessThanOrEqual(1);
-  expect(unlockedKnockout.x + unlockedKnockout.width).toBeLessThanOrEqual(unlockedHelp.x);
+  expect(Math.abs(unlockedShare.y + unlockedShare.height / 2 - (unlockedHelp.y + unlockedHelp.height / 2))).toBeLessThanOrEqual(1);
+  expect(unlockedShare.x + unlockedShare.width).toBeLessThanOrEqual(unlockedHelp.x);
+  expect(unlockedStages.y).toBeGreaterThanOrEqual(unlockedHelp.y + unlockedHelp.height);
+  expect(unlockedKnockout.x + unlockedKnockout.width).toBeLessThanOrEqual(320);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
