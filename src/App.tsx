@@ -1,8 +1,18 @@
 import { For, Show, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { createBrowserController } from "./state/browser";
+import { focusedTeamFromSearch, readFocusedTeam, rememberFocusedTeam } from "./state/focus-preference";
+import { readTimeZone, rememberTimeZone, systemTimeZone } from "./state/timezone-preference";
 import { rankingSnapshot } from "./domain/rankings";
 import { planRankingFill } from "./domain/ranking-fill";
+import { deriveTeamFocus } from "./domain/focus";
+import { TeamFocusPicker } from "./components/TeamFocusPicker";
+import { ShareMenu } from "./components/ShareMenu";
+import { SettingsMenu } from "./components/SettingsMenu";
+import { PoolInfographicDialog } from "./components/PoolInfographicDialog";
+import { TimeZoneContext } from "./components/timezone-context";
+import type { DerivedScenario, Scenario } from "./domain/types";
 import { captureShareSnapshot, createShareClient } from "./sharing/client";
+import { createPosterClient } from "./sharing/poster-client";
 import { beginClipboardWrite } from "./sharing/clipboard";
 import { Icon } from "./components/Icon";
 import { MatchDetailsDialog } from "./components/MatchDetailsDialog";
@@ -11,6 +21,7 @@ import "./App.css";
 
 function App() {
   const shareClient = createShareClient();
+  const posterClient = createPosterClient();
   const browser = createBrowserController(undefined, import.meta.env.BASE_URL, {
     findAlias: async (scenario, signal) => {
       const snapshot = captureShareSnapshot(scenario, window.location.href, import.meta.env.BASE_URL);
@@ -19,21 +30,31 @@ function App() {
     },
   });
   const controller = browser.controller;
-  const initialMatch = controller.getState().derived.fixtures.find((fixture) => fixture.id === browser.matchId());
-  const [state, setState] = createSignal(controller.getState());
+  const initialState = controller.getState();
+  const initialMatch = initialState.derived.fixtures.find((fixture) => fixture.id === browser.matchId());
+  const linkFocus = browser.urlError() ? undefined : focusedTeamFromSearch(window.location.search, initialState.derived.tournament.teams);
+  const savedFocus = browser.urlError() ? undefined : linkFocus ?? readFocusedTeam(initialState.derived.tournament.teams);
+  const initialFocus = savedFocus && initialMatch && !deriveTeamFocus(initialState.derived, savedFocus).fixtureIds.has(initialMatch.id) ? undefined : savedFocus;
+  const [state, setState] = createSignal(initialState);
   const [urlError, setUrlError] = createSignal(browser.urlError());
-  const [phase, setPhase] = createSignal<"pools" | "knockout">(initialMatch && initialMatch.stage !== "pool" && controller.getState().derived.poolsComplete ? "knockout" : "pools");
+  const [phase, setPhase] = createSignal<"pools" | "knockout">(initialMatch && initialMatch.stage !== "pool" && initialState.derived.poolsComplete ? "knockout" : "pools");
   const [poolView, setPoolView] = createSignal<"pool" | "timeline">("pool");
   const [knockoutView, setKnockoutView] = createSignal<"rounds" | "timeline" | "bracket">("rounds");
   const [poolFilter, setPoolFilter] = createSignal("all");
+  const [focusedTeam, setFocusedTeam] = createSignal<string | undefined>(initialFocus);
+  const [timeZone, setTimeZone] = createSignal(readTimeZone());
+  const deviceTimeZone = systemTimeZone();
+  const effectiveTimeZone = () => timeZone() ?? deviceTimeZone;
   const [activeFixtureId, setActiveFixtureId] = createSignal<number | undefined>(browser.urlError() ? undefined : initialMatch?.id);
   const [copyStatus, setCopyStatus] = createSignal("");
   const [manualUrl, setManualUrl] = createSignal("");
   const [sharing, setSharing] = createSignal(false);
+  const [poolShare, setPoolShare] = createSignal<{ derived: DerivedScenario; scenario: Scenario; teamId: string; timeZone: string; returnFocus: HTMLElement }>();
   let disposed = false;
+  let loadedLinkFocus = linkFocus;
   let detailTrigger: HTMLElement | undefined;
   let detailTriggerId: number | undefined;
-  let loadedTournament = controller.getState().scenario.tournamentId;
+  let loadedTournament = initialState.scenario.tournamentId;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
   const closeDetails = () => { controller.finishGroup(); browser.setMatch(); };
   const openDetails = (id: number, trigger: HTMLButtonElement) => {
@@ -49,18 +70,27 @@ function App() {
   };
   const unsubscribe = browser.subscribe(() => untrack(() => {
     const next = controller.getState();
+    const nextLinkFocus = browser.urlError() ? undefined : focusedTeamFromSearch(window.location.search, next.derived.tournament.teams);
     const changedTournament = next.scenario.tournamentId !== loadedTournament;
+    const recovered = Boolean(urlError()) && !browser.urlError();
     const matchId = browser.urlError() ? undefined : browser.matchId();
-    if (browser.urlError() || changedTournament) {
+    if (browser.urlError() || changedTournament || recovered) {
       // Route changes dismiss the old dialog without clearing the newly addressed match.
       setActiveFixtureId(undefined); setPoolFilter("all");
+      setFocusedTeam(browser.urlError() ? undefined : nextLinkFocus ?? readFocusedTeam(next.derived.tournament.teams));
       detailTrigger = undefined; detailTriggerId = undefined;
+    } else if (nextLinkFocus !== loadedLinkFocus) {
+      setFocusedTeam(nextLinkFocus ?? readFocusedTeam(next.derived.tournament.teams)); setPoolFilter("all");
     }
+    loadedLinkFocus = nextLinkFocus;
     if (activeFixtureId() !== matchId) controller.finishGroup();
     if (detailTriggerId !== matchId) { detailTrigger = undefined; detailTriggerId = undefined; }
     loadedTournament = next.scenario.tournamentId;
     setState(next); setUrlError(browser.urlError());
     const match = next.derived.fixtures.find((fixture) => fixture.id === matchId);
+    // A newly addressed match must stay visible even if a previous team filter hid it.
+    if (match && activeFixtureId() !== match.id && focusedTeam() &&
+      !deriveTeamFocus(next.derived, focusedTeam()).fixtureIds.has(match.id)) setFocusedTeam(undefined);
     if (match) {
       setPhase(match.stage !== "pool" && next.derived.poolsComplete ? "knockout" : "pools");
       if (match.stage === "pool" && poolFilter() !== "all" && poolFilter() !== match.pool) setPoolFilter(match.pool ?? "all");
@@ -81,6 +111,10 @@ function App() {
   const tournament = () => state().derived.tournament;
   const fixtures = () => state().derived.fixtures;
   const fixtureById = createMemo(() => new Map(fixtures().map((fixture) => [fixture.id, fixture])));
+  const teamFocus = createMemo(() => deriveTeamFocus(state().derived, focusedTeam()));
+  const visibleFixtureIds = () => focusedTeam() ? teamFocus().fixtureIds : undefined;
+  const visiblePools = () => tournament().pools.filter((pool) => !focusedTeam() || teamFocus().poolIds.has(pool.id));
+  const activePoolFilter = () => visiblePools().some((pool) => pool.id === poolFilter()) ? poolFilter() : "all";
   const poolFixtures = createMemo(() => fixtures().filter((fixture) => fixture.stage === "pool"));
   const poolCount = () => poolFixtures().filter((fixture) => fixture.result && !fixture.issues.length).length;
   const knockoutTotal = () => fixtures().length - poolFixtures().length;
@@ -89,10 +123,13 @@ function App() {
   const canFill = () => fixtures().some((fixture) => !fixture.prediction && fixture.homeTeam && fixture.awayTeam);
   const rankingSource = () => rankingSnapshot(tournament().id);
   const activePhase = () => phase() === "knockout" && !knockoutLocked() ? "knockout" : "pools";
+  const hasFocusedKnockout = () => !focusedTeam() || fixtures().some((fixture) => fixture.stage !== "pool" && teamFocus().fixtureIds.has(fixture.id));
   const knockoutHint = () => "Complete " + (poolFixtures().length - poolCount()) + " remaining pool " + (poolFixtures().length - poolCount() === 1 ? "match" : "matches") + " to unlock the knockout. Resolve any conflicting details first.";
-  const copyLink = async () => {
+  const copyLink = async (fullTournament = false) => {
     if (sharing() || urlError()) return;
-    const snapshot = captureShareSnapshot(controller.getState().scenario, window.location.href, import.meta.env.BASE_URL);
+    const source = new URL(window.location.href);
+    if (fullTournament) source.searchParams.delete("match");
+    const snapshot = captureShareSnapshot(controller.getState().scenario, source.href, import.meta.env.BASE_URL);
     setSharing(true); setManualUrl(""); setCopyStatus("");
     if (copyTimer) clearTimeout(copyTimer);
     const link = shareClient.getLink(snapshot);
@@ -129,7 +166,7 @@ function App() {
       if (!disposed) setSharing(false);
     }
   };
-  return <div class="app-shell">
+  return <TimeZoneContext.Provider value={effectiveTimeZone}><div class="app-shell">
     <header class="app-header">
       <div class="toolbar-main">
         <div class="wordmark" aria-label={"Rugby World Cup " + (tournament().id === "rwc2027" ? "2027" : "2023") + " predictor"}>
@@ -157,7 +194,15 @@ function App() {
             <button type="button" class="icon-button" disabled={Boolean(urlError()) || !state().canRedo} onClick={() => controller.redo()} aria-label="Redo prediction action" title="Redo (Ctrl/⌘ Shift Z)"><Icon name="redo" /></button>
             <button type="button" class="icon-button" disabled={Boolean(urlError()) || !Object.keys(state().scenario.predictions).length} onClick={() => controller.reset()} aria-label="Reset all picks" title="Reset all picks"><Icon name="reset" /></button>
           </div>
-          <button type="button" class="copy-button" disabled={Boolean(urlError()) || sharing()} aria-busy={sharing()} onClick={() => void copyLink()} aria-label="Copy link"><Icon name="link" /><span>{sharing() ? "Saving…" : "Copy link"}</span></button>
+          <ShareMenu team={tournament().teams.find((team) => team.id === focusedTeam())} disabled={Boolean(urlError()) || sharing()} sharing={sharing()}
+            onCopy={() => void copyLink(true)} onPool={(returnFocus) => {
+              const teamId = focusedTeam();
+              if (teamId && !urlError()) {
+                const captured = controller.getState();
+                setPoolShare({ derived: captured.derived, scenario: captured.scenario, teamId, timeZone: effectiveTimeZone(), returnFocus });
+              }
+            }} />
+          <SettingsMenu timeZone={timeZone()} onChange={(value) => { setTimeZone(value); rememberTimeZone(value); }} />
         </div>
       </div>
       <div class="toolbar-views"><div class="toolbar-views-inner">
@@ -171,8 +216,10 @@ function App() {
             <button type="button" aria-pressed={poolView() === "timeline"} onClick={() => setPoolView("timeline")}><Icon name="calendar" />Timeline</button>
           </Show>
         </div>
-        <Show when={activePhase() === "pools"}><div class="pool-filter"><span class="control-caption">Pool</span><div class="segmented" role="group" aria-label="Pool filter">
-          <For each={["all", ...tournament().pools.map((pool) => pool.id)]}>{(pool) => <button type="button" aria-pressed={poolFilter() === pool} onClick={() => setPoolFilter(pool)}>{pool === "all" ? "All" : pool}</button>}</For>
+        <TeamFocusPicker teams={tournament().teams} value={focusedTeam()} disabled={Boolean(urlError())}
+          onChange={(teamId) => { setFocusedTeam(teamId); rememberFocusedTeam(teamId); setPoolFilter("all"); browser.clearFocusDestination(); }} />
+        <Show when={activePhase() === "pools" && visiblePools().length > 1}><div class="pool-filter"><span class="control-caption">Pool</span><div class="segmented" role="group" aria-label="Pool filter">
+          <For each={["all", ...visiblePools().map((pool) => pool.id)]}>{(pool) => <button type="button" aria-pressed={activePoolFilter() === pool} onClick={() => setPoolFilter(pool)}>{pool === "all" ? "All" : pool}</button>}</For>
         </div></div></Show>
         <button type="button" class="fill-button" disabled={Boolean(urlError()) || !canFill()}
           aria-label="Fill unpicked matches" title={`Fill all unpicked matches using World Rugby rankings (${rankingSource().effectiveDate}). Keeps your existing picks; undo in one action.`}
@@ -194,17 +241,19 @@ function App() {
       <fieldset class="prediction-workspace" disabled={Boolean(urlError())}>
         <legend class="sr-only">Tournament predictions</legend>
         <Show when={activePhase() === "pools"} fallback={<section class="knockout-view" aria-label="Knockout predictions">
-          <Show when={knockoutView() === "rounds"}><KnockoutRounds derived={state().derived} controller={controller} onDetails={openDetails} /></Show>
-          <Show when={knockoutView() === "timeline"}><Timeline phase="knockout" derived={state().derived} controller={controller} onDetails={openDetails} /></Show>
-          <Show when={knockoutView() === "bracket"}><KnockoutBracket derived={state().derived} controller={controller} onDetails={openDetails} /></Show>
+          <Show when={hasFocusedKnockout()} fallback={<p class="focus-empty">{tournament().teams.find((team) => team.id === focusedTeam())?.name} has no knockout matches in this prediction.</p>}>
+          <Show when={knockoutView() === "rounds"}><KnockoutRounds derived={state().derived} controller={controller} onDetails={openDetails} visibleFixtureIds={visibleFixtureIds()} /></Show>
+          <Show when={knockoutView() === "timeline"}><Timeline phase="knockout" derived={state().derived} controller={controller} onDetails={openDetails} visibleFixtureIds={visibleFixtureIds()} /></Show>
+          <Show when={knockoutView() === "bracket"}><KnockoutBracket derived={state().derived} controller={controller} onDetails={openDetails} visibleFixtureIds={visibleFixtureIds()} /></Show>
+          </Show>
         </section>}>
-          <Show when={poolView() === "pool"} fallback={<Timeline phase="pools" filter={poolFilter()} derived={state().derived} controller={controller} onDetails={openDetails} />}>
-            <PoolsByPool filter={poolFilter()} derived={state().derived} controller={controller} onDetails={openDetails} />
+          <Show when={poolView() === "pool"} fallback={<Timeline phase="pools" filter={activePoolFilter()} derived={state().derived} controller={controller} onDetails={openDetails} visibleFixtureIds={visibleFixtureIds()} />}>
+            <PoolsByPool filter={activePoolFilter()} derived={state().derived} controller={controller} onDetails={openDetails} visibleFixtureIds={visibleFixtureIds()} />
           </Show>
         </Show>
       </fieldset>
       <footer class="app-footer">
-        <p>Kickoff times are local to you. Prediction edits happen in your browser. Share your predictions with a link.</p>
+        <p>Kickoff times are shown in {effectiveTimeZone()}. Prediction edits happen in your browser. Share your predictions with a link.</p>
         <details class="rules-details"><summary>{tournament().rulesStatus === "provisional" ? "Provisional 2027 rules & suggested outcomes" : "Tournament rules & sources"}</summary>
           <p>{tournament().rulesNote}</p><p>Unspecified scores and tries use reproducible defaults. Open match details to choose a margin, tries, exact scores or bonus points. These are suggestions, rather than live odds or a calibrated forecast.</p>
           <p>Fill matches uses <a href={rankingSource().source} target="_blank" rel="noopener noreferrer">{rankingSource().label}</a>. Rating-point gaps determine projected margins, scores and tries. Existing choices stay intact; conflicts can leave later matches waiting. You can undo the whole fill at once.</p>
@@ -214,10 +263,12 @@ function App() {
       </footer>
     </main>
     <div classList={{ "share-status": true, "share-status--visible": Boolean(copyStatus()) }} role="status">{copyStatus()}</div>
+    <Show when={poolShare()}>{(snapshot) => <PoolInfographicDialog derived={snapshot().derived} scenario={snapshot().scenario} teamId={snapshot().teamId} timeZone={snapshot().timeZone} posterClient={posterClient}
+      returnFocus={snapshot().returnFocus} onClose={() => setPoolShare(undefined)} />}</Show>
     <Show when={activeFixtureId()} keyed>{(id) => <MatchDetailsDialog fixture={fixtureById().get(id)!} controller={controller} onClose={closeDetails}
       returnFocus={() => detailReturnTarget(id)} onCopyLink={copyLink} sharing={sharing()} copyDisabled={Boolean(urlError())}
       copyStatus={copyStatus()} manualUrl={manualUrl()} />}</Show>
-  </div>;
+  </div></TimeZoneContext.Provider>;
 }
 
 export default App;

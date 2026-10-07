@@ -4,14 +4,14 @@ import { intentFields } from "../domain/completion";
 import type { ScenarioController } from "../state/controller";
 import { TeamLabel, sourceLabel } from "./TeamLabel";
 import { Icon } from "./Icon";
+import { dateTimeFormat } from "./date-time";
+import { useTimeZone } from "./timezone-context";
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const stageNames = { pool: "Pool", round16: "R16", quarter: "QF", semi: "SF", bronze: "Bronze", final: "Final" } as const;
 
-export function fixtureDateTime(fixture: ResolvedFixture): string {
+export function fixtureDateTime(fixture: ResolvedFixture, timeZone?: string): string {
   const date = new Date(fixture.kickoff);
-  return `${dateFormat.format(date)} · ${timeFormat.format(date)}`;
+  return `${dateTimeFormat("date", timeZone).format(date)} · ${dateTimeFormat("time", timeZone).format(date)}`;
 }
 
 export function fixtureTeamName(fixture: ResolvedFixture, side: Side): string {
@@ -38,6 +38,7 @@ export interface FixtureCardProps {
 }
 
 export function FixtureCard(props: FixtureCardProps) {
+  const timeZone = useTimeZone();
   const variant = () => props.variant ?? "card";
   const isPool = () => props.fixture.stage === "pool";
   const ready = () => Boolean(props.fixture.homeTeam && props.fixture.awayTeam);
@@ -66,17 +67,18 @@ export function FixtureCard(props: FixtureCardProps) {
     "fixture-card--bracket": variant() === "bracket", "has-prediction": Boolean(result()), "has-conflict": props.fixture.issues.length > 0,
   }} aria-label={`Match ${props.fixture.id}: ${fixtureTeamName(props.fixture, "home")} versus ${fixtureTeamName(props.fixture, "away")}`}>
     <Show when={variant() === "row"} fallback={<Show when={variant() === "bracket"} fallback={
-      <div class="fixture-meta"><span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{fixtureDateTime(props.fixture)}</time></div>
+      <div class="fixture-meta"><span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{fixtureDateTime(props.fixture, timeZone())}</time></div>
     }>
       <button type="button" class="fixture-meta fixture-bracket-header" disabled={!ready()} aria-label={`Details for match ${props.fixture.id}`}
         aria-haspopup="dialog" aria-controls={`match-${props.fixture.id}-details-dialog`} onClick={(event) => openDetails(event.currentTarget)}>
-        <span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{fixtureDateTime(props.fixture)}</time>
+        <span>Match {props.fixture.id}</span><time dateTime={props.fixture.kickoff}>{fixtureDateTime(props.fixture, timeZone())}</time>
       </button>
     </Show>}>
-      <div class="fixture-row-time"><time dateTime={props.fixture.kickoff}>{timeFormat.format(new Date(props.fixture.kickoff))}</time>
+      <div class="fixture-row-time"><time dateTime={props.fixture.kickoff}>{dateTimeFormat("time", timeZone()).format(new Date(props.fixture.kickoff))}</time>
         <span>{isPool() ? `Pool ${props.fixture.pool}` : stageNames[props.fixture.stage]} · M{props.fixture.id}</span>
       </div>
     </Show>
+    <Show when={props.fixture.venue}><p class="fixture-venue">{props.fixture.venue}</p></Show>
     <fieldset class="fixture-edit" disabled={!ready()}>
       <legend class="sr-only">{isPool() ? "Pick the match result" : "Pick the team to advance"}</legend>
       <div class="winner-options">{teamButton("home")}<Show when={variant() === "row" && isPool()}>{drawButton()}</Show>{teamButton("away")}</div>

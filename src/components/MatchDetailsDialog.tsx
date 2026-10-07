@@ -4,6 +4,7 @@ import type { ScenarioController } from "../state/controller";
 import { TeamLabel } from "./TeamLabel";
 import { Icon } from "./Icon";
 import { clearFixturePrediction, fixtureChoice, fixtureDateTime, fixtureTeamName } from "./FixtureCard";
+import { useTimeZone } from "./timezone-context";
 
 type NumericKey = "margin" | "homeScore" | "awayScore" | "homeTries" | "awayTries";
 type BonusKey = "homeTryBonus" | "awayTryBonus" | "homeLosingBonus" | "awayLosingBonus";
@@ -79,6 +80,7 @@ export interface MatchDetailsDialogProps {
 
 /** One live editing session, including its dependent consequences, is one undo action. */
 export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
+  const timeZone = useTimeZone();
   let dialog!: HTMLDialogElement;
   let closed = false;
   const intent = () => props.fixture.prediction?.intent ?? {};
@@ -123,7 +125,7 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
   });
 
   return <dialog ref={(element) => { dialog = element; }} id={`match-${props.fixture.id}-details-dialog`} class="match-dialog"
-    aria-labelledby={`match-${props.fixture.id}-dialog-title`} aria-describedby={`match-${props.fixture.id}-dialog-meta`}
+    aria-labelledby={`match-${props.fixture.id}-dialog-title`} aria-describedby={`match-${props.fixture.id}-dialog-meta match-${props.fixture.id}-dialog-venue`}
     onCancel={(event) => { event.preventDefault(); close(); }} onClose={close}
     onClick={(event) => {
       if (event.target !== dialog) return;
@@ -132,7 +134,8 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
     }}>
     <div class="match-dialog-header">
       <div><h2 class="match-dialog-title" id={`match-${props.fixture.id}-dialog-title`}>{title()}</h2>
-        <p class="match-dialog-meta" id={`match-${props.fixture.id}-dialog-meta`}>Match {props.fixture.id} · {fixtureDateTime(props.fixture)}</p>
+        <p class="match-dialog-meta" id={`match-${props.fixture.id}-dialog-meta`}>Match {props.fixture.id} · {fixtureDateTime(props.fixture, timeZone())}</p>
+        <p class="match-dialog-venue" id={`match-${props.fixture.id}-dialog-venue`}>{props.fixture.venue}</p>
       </div>
       <button type="button" class="match-dialog-close" aria-label="Close match details" onClick={close}><Icon name="close" size={20} /></button>
     </div>
@@ -195,6 +198,5 @@ export function MatchDetailsDialog(props: MatchDetailsDialogProps) {
     <div class="match-dialog-share-status" role="status" aria-live="polite">{props.copyStatus}</div>
     <Show when={props.manualUrl}><label class="manual-share match-dialog-manual-link">Your match link<input type="text" readonly value={props.manualUrl}
       onFocus={(event) => event.currentTarget.select()} /></label></Show>
-    <p class="match-dialog-venue">{props.fixture.venue}</p>
   </dialog>;
 }

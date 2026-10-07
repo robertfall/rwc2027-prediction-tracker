@@ -2,13 +2,19 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import { createHash } from "node:crypto";
 
 const card = (page: Page, id: number) => page.locator(`[data-fixture-id="${id}"]`);
-const copy = (page: Page) => page.getByRole("button", { name: "Copy link", exact: true });
+const share = (page: Page) => page.getByRole("button", { name: "Share", exact: true });
 const undo = (page: Page) => page.getByRole("button", { name: "Undo last prediction action" });
 const tokenIn = (url: string) => new URL(url).hash.slice("#predictions=".length);
 const sharePath = (alias: string) => `/s/${alias}`;
 const aliasPattern = /^[a-z]+\.[a-z]+\.[a-z]+$/;
 const lookupPattern = /\/api\/shares\?fingerprint=/;
 const fingerprint = (token: string) => createHash("sha256").update(token).digest("hex");
+
+async function copyUrl(page: Page): Promise<void> {
+  await share(page).click();
+  await page.getByRole("dialog", { name: "Share predictions", exact: true })
+    .getByRole("button", { name: "Copy URL - Share Full Tournament", exact: true }).click();
+}
 
 async function missLookups(page: Page): Promise<void> {
   await page.route(lookupPattern, (route) => route.fulfill({
@@ -159,14 +165,14 @@ test("copy starts the activated clipboard write before saving, captures its clic
     await gate;
     await route.fulfill({ response: await route.fetch() });
   });
-  await copy(page).click();
+  await copyUrl(page);
   await expect.poll(() => receivedToken).toBe(tokenIn(clickedUrl));
   await expect.poll(() => page.evaluate(() => Reflect.get(window, "clipboardWriteCount"))).toBe(1);
   expect(await page.evaluate(() => Reflect.get(window, "clipboardWriteTypes"))).toEqual(["text/plain"]);
   expect(await page.evaluate(() => Reflect.get(window, "clipboardWriteActivated"))).toBe(true);
   expect(await page.evaluate(() => Reflect.get(window, "clipboardWriteTextCount"))).toBe(0);
   expect(await page.evaluate(() => Reflect.get(window, "copiedPredictionLink"))).toBe("");
-  await expect(copy(page)).toBeDisabled();
+  await expect(share(page)).toBeDisabled();
   await card(page, 1).getByRole("button", { name: "Hong Kong China", exact: true }).click();
   const changedUrl = page.url();
   expect(changedUrl).not.toBe(clickedUrl);
@@ -186,7 +192,7 @@ test("copy starts the activated clipboard write before saving, captures its clic
   await undo(page).click();
   expect(page.url()).toBe(link);
   await context.setOffline(true);
-  await copy(page).click();
+  await copyUrl(page);
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   expect(await copiedLink(page)).toBe(link);
   expect(await page.evaluate(() => Reflect.get(window, "clipboardWriteCount"))).toBe(2);
@@ -224,7 +230,7 @@ test("a short link replays conflicts, explicit zero and false, custom engine pin
   await originalDetails.getByRole("button", { name: "Done", exact: true }).click();
   const token = tokenIn(page.url());
   await expect(card(page, 1).locator(".fixture-issues")).toBeVisible();
-  await copy(page).click();
+  await copyUrl(page);
   const link = await copiedLink(page);
   await expect(page).toHaveURL(link);
   const record = await request.get(`/api/shares/${new URL(link).pathname.slice("/s/".length)}`);
@@ -286,7 +292,7 @@ test("service failures and unsafe responses copy the full URL without changing p
     await card(page, 1).getByRole("button", { name: "Australia", exact: true }).click();
     const fullUrl = page.url();
     await page.route("**/api/shares", (route) => route.fulfill({ ...response, contentType: "application/json" }));
-    await copy(page).click();
+    await copyUrl(page);
     expect(await copiedLink(page)).toBe(fullUrl);
     await expect(page.getByRole("status").filter({ hasText: /full link.*unavailable/i })).toBeVisible();
     expect(page.url()).toBe(fullUrl);
@@ -307,10 +313,10 @@ test("copying offline falls back promptly while prediction edits and undo keep w
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/shares") offlineRequests.push(request.url());
   });
-  await copy(page).click();
+  await copyUrl(page);
   expect(await copiedLink(page)).toBe(fullUrl);
   await expect(page.getByRole("status").filter({ hasText: /full link.*unavailable/i })).toBeVisible();
-  await expect(copy(page)).toBeEnabled();
+  await expect(share(page)).toBeEnabled();
   await card(page, 2).locator(".winner-choice").first().click();
   await undo(page).click();
   expect(page.url()).toBe(fullUrl);
@@ -426,7 +432,7 @@ test("short-address replacement preserves undo and Back/Forward between cached a
   await page.goto("/");
   const historyLength = await page.evaluate(() => history.length);
   await card(page, 1).getByRole("button", { name: "Australia", exact: true }).click();
-  await copy(page).click();
+  await copyUrl(page);
   const firstUrl = await copiedLink(page);
   await expect(page).toHaveURL(firstUrl);
   await expect(undo(page)).toBeEnabled();
@@ -435,7 +441,7 @@ test("short-address replacement preserves undo and Back/Forward between cached a
   expect(tokenIn(page.url())).toMatch(/^v3\./);
   const secondToken = tokenIn(page.url());
   await page.evaluate(() => Reflect.set(window, "copiedPredictionLink", ""));
-  await copy(page).click();
+  await copyUrl(page);
   const secondUrl = await copiedLink(page);
   expect(secondUrl).not.toBe(firstUrl);
   await expect(page).toHaveURL(secondUrl);
@@ -469,7 +475,7 @@ test("short-address replacement preserves undo and Back/Forward between cached a
   }, conflictingUrl);
   await expect(page.getByRole("alert")).toContainText("A short prediction link cannot also contain prediction details.");
   expect(page.url()).toBe(conflictingUrl);
-  await expect(copy(page)).toBeDisabled();
+  await expect(share(page)).toBeDisabled();
   await expect(card(page, 1).locator(".winner-choice").first()).toBeDisabled();
   await page.waitForLoadState("networkidle");
   expect(calls).toHaveLength(callsBeforeNavigation);

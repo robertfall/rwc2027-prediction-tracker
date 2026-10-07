@@ -137,6 +137,45 @@ describe("Browser URL and history ownership", () => {
     app.dispose();
   });
 
+  it("navigates shared team destinations without replacing the snapshot or losing undo and redo", () => {
+    const web = adapter("/?focus=nz");
+    const app = createBrowserController(web.web, "/");
+    app.controller.update(7, { winner: "home" });
+    const token = encodeScenario(app.controller.getState().scenario);
+    app.controller.update(1, { winner: "away" });
+    app.controller.undo();
+    const before = app.controller.getState();
+    const writes = web.writes.length;
+    web.navigate(`/?focus=za#predictions=${token}`);
+    expect(app.controller.getState()).toBe(before);
+    expect(before.canUndo).toBe(true);
+    expect(before.canRedo).toBe(true);
+    expect(web.writes).toHaveLength(writes);
+    app.controller.redo();
+    expect(app.controller.getState().scenario.predictions[1].intent.winner).toBe("away");
+    expect(web.url()).toContain("?focus=za");
+    app.dispose();
+  });
+
+  it("clears a shared team destination after a local choice without changing predictions, match or history", () => {
+    const web = adapter("/?focus=za&match=7&from=friend");
+    const app = createBrowserController(web.web, "/");
+    app.controller.update(7, { winner: "home" });
+    const before = app.controller.getState();
+    const listener = vi.fn();
+    app.subscribe(listener);
+    app.clearFocusDestination();
+    expect(web.url()).toBe(`/?match=7&from=friend#predictions=${encodeScenario(before.scenario)}`);
+    expect(app.matchId()).toBe(7);
+    expect(app.controller.getState()).toBe(before);
+    expect(listener).toHaveBeenCalledOnce();
+    app.clearFocusDestination();
+    expect(listener).toHaveBeenCalledOnce();
+    app.controller.undo();
+    expect(app.controller.getState().scenario.predictions).toEqual({});
+    app.dispose();
+  });
+
   it("keeps accepted double-slash fragment paths on the same origin when changing match focus", () => {
     const token = encodeScenario(pick());
     for (const path of ["//", "//another.example"]) {

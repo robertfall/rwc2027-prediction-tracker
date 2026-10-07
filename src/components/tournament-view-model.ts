@@ -1,11 +1,11 @@
 import type { Fixture, ResolvedFixture, Stage, Team, Tournament } from "../domain/types";
+import { dateTimeFormat, localDateKey } from "./date-time";
 
 export const stageOrder: Stage[] = ["round16", "quarter", "semi", "bronze", "final"];
 export const stageLabels: Record<Stage, string> = {
   pool: "Pools", round16: "Round of 16", quarter: "Quarter-finals",
   semi: "Semi-finals", bronze: "Bronze final", final: "Final",
 };
-const rangeFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
 export function isCompleted(fixture: ResolvedFixture): boolean {
   return Boolean(fixture.result && fixture.issues.length === 0);
@@ -20,25 +20,21 @@ export function placedTeam(fixture: ResolvedFixture | undefined, loser = false):
   return side === "home" ? fixture.homeTeam : fixture.awayTeam;
 }
 
-export function dateRange(fixtures: Fixture[]): string {
+export function dateRange(fixtures: Fixture[], timeZone?: string): string {
   if (!fixtures.length) return "";
   const ordered = [...fixtures].sort(byKickoff);
-  return rangeFormat.formatRange(new Date(ordered[0].kickoff), new Date(ordered[ordered.length - 1].kickoff));
+  return dateTimeFormat("date", timeZone).formatRange(new Date(ordered[0].kickoff), new Date(ordered[ordered.length - 1].kickoff));
 }
 
 export function byKickoff(a: Fixture, b: Fixture): number {
   return Date.parse(a.kickoff) - Date.parse(b.kickoff) || a.id - b.id;
 }
 
-function localDay(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
 export interface TimelineDay { key: string; kickoff: string; fixtureIds: number[] }
 export interface TimelineGroup { key: string; label: string; fixtureIds: number[]; days: TimelineDay[] }
 
 /** Presentation groups only; all results and qualification come from the domain. */
-export function timelineGroups(tournament: Tournament, phase: "pools" | "knockout", filter?: string): TimelineGroup[] {
+export function timelineGroups(tournament: Tournament, phase: "pools" | "knockout", filter?: string, timeZone?: string): TimelineGroup[] {
   const fixtures = tournament.fixtures.filter((fixture) => phase === "pools" ? fixture.stage === "pool" : fixture.stage !== "pool").sort(byKickoff);
   const groups = new Map<string, TimelineGroup>();
   const appearances = new Map<string, number>();
@@ -56,16 +52,16 @@ export function timelineGroups(tournament: Tournament, phase: "pools" | "knockou
       label = `Round ${round}`;
     } else {
       // Legacy fixtures have unequal team appearances within calendar weeks.
-      const monday = new Date(fixture.kickoff);
-      monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7);
-      key = `week-${localDay(monday)}`;
+      const monday = new Date(`${localDateKey(new Date(fixture.kickoff), timeZone)}T00:00:00Z`);
+      monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+      key = `week-${monday.toISOString().slice(0, 10)}`;
       label = "Pool matches";
     }
     if (phase === "pools" && filter && filter !== "all" && fixture.pool !== filter) continue;
     let group = groups.get(key);
     if (!group) { group = { key, label, fixtureIds: [], days: [] }; groups.set(key, group); }
     group.fixtureIds.push(fixture.id);
-    const dayKey = localDay(new Date(fixture.kickoff));
+    const dayKey = localDateKey(new Date(fixture.kickoff), timeZone);
     let day = group.days.find((candidate) => candidate.key === dayKey);
     if (!day) { day = { key: dayKey, kickoff: fixture.kickoff, fixtureIds: [] }; group.days.push(day); }
     day.fixtureIds.push(fixture.id);

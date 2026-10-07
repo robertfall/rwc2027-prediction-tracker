@@ -13,6 +13,7 @@ export interface BrowserController {
   urlError: () => string | undefined;
   matchId: () => number | undefined;
   setMatch: (id?: number) => void;
+  clearFocusDestination: () => void;
   rememberShortLink: (token: string, alias: string) => boolean;
   recover: () => void;
   subscribe: (listener: () => void) => () => void;
@@ -57,12 +58,14 @@ export function createBrowserController(adapter: BrowserAdapter = nativeBrowser,
     return controller.getState().derived.fixtures.some((fixture) => fixture.id === id) ? id : undefined;
   }
 
-  function onlyMatchChanged(before: string, after: string): boolean {
+  function onlyDestinationChanged(before: string, after: string): boolean {
     // Prefix the fixed origin so a double-slash path stays a path, not an authority.
     const previous = new URL(`https://prediction.invalid${before}`);
     const next = new URL(`https://prediction.invalid${after}`);
     previous.searchParams.delete("match");
     next.searchParams.delete("match");
+    previous.searchParams.delete("focus");
+    next.searchParams.delete("focus");
     return previous.href === next.href;
   }
 
@@ -158,7 +161,7 @@ export function createBrowserController(adapter: BrowserAdapter = nativeBrowser,
     const previous = lastLocation;
     const previousError = error;
     const scenario = read();
-    if (!previousError && !error && onlyMatchChanged(previous, lastLocation) && encodeScenario(scenario) === currentToken) {
+    if (!previousError && !error && onlyDestinationChanged(previous, lastLocation) && encodeScenario(scenario) === currentToken) {
       controller.finishGroup();
       scheduleLookup();
       notify();
@@ -191,6 +194,18 @@ export function createBrowserController(adapter: BrowserAdapter = nativeBrowser,
       notify();
     },
     rememberShortLink,
+    clearFocusDestination: () => {
+      if (disposed || error) return;
+      const location = adapter.readLocation();
+      const search = new URLSearchParams(location.search);
+      if (!search.has("focus")) return;
+      search.delete("focus");
+      const query = search.toString();
+      const path = location.pathname.startsWith("//") ? appPath : location.pathname;
+      adapter.replaceUrl(`${path}${query ? `?${query}` : ""}${location.hash}`);
+      lastLocation = key(adapter.readLocation());
+      scheduleLookup(); notify();
+    },
     recover: () => {
       error = undefined;
       appPath = basePath;

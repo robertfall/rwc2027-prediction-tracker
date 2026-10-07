@@ -54,6 +54,82 @@ async function expectReadableTeamChoices(page: Page): Promise<void> {
   expect(failures, "Every full team name and flag must fit its mobile winner button without truncation").toEqual([]);
 }
 
+async function expectReadableVenues(page: Page): Promise<void> {
+  await expect(page.locator(".fixture-card .fixture-venue")).toHaveCount(await page.locator(".fixture-card").count());
+  const failures = await page.locator(".fixture-card .fixture-venue").evaluateAll((venues) => venues.flatMap((venue) => {
+    const card = venue.closest(".fixture-card");
+    if (!card || !venue.textContent?.trim()) return [{ text: venue.textContent, reason: "Missing venue or match card" }];
+    const range = document.createRange(); range.selectNodeContents(venue);
+    const lines = [...range.getClientRects()];
+    const bounds = venue.getBoundingClientRect(); const cardBounds = card.getBoundingClientRect();
+    const style = getComputedStyle(venue); const clamp = style.getPropertyValue("-webkit-line-clamp");
+    const fits = lines.length > 0 && lines.every((line) => line.width > 0 && line.left >= bounds.left - 1 &&
+      line.right <= bounds.right + 1 && line.top >= cardBounds.top - 1 && line.bottom <= cardBounds.bottom + 1);
+    const wraps = style.whiteSpace !== "nowrap" && style.textOverflow !== "ellipsis" &&
+      (clamp === "none" || clamp === "" || clamp === "0");
+    return fits && wraps && venue.scrollWidth <= venue.clientWidth + 1 ? [] :
+      [{ text: venue.textContent, reason: JSON.stringify({ fits, wraps, scrollWidth: venue.scrollWidth, clientWidth: venue.clientWidth }) }];
+  }));
+  expect(failures, "Every venue must remain complete and fit its card in the current layout").toEqual([]);
+}
+
+test("venues remain readable across match views and mobile wrapping while prediction edits stay undoable", async ({ page }) => {
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  const longVenue = "North Queensland Stadium, Townsville";
+  await expect(card(page, 7).locator(".fixture-venue")).toHaveText("Adelaide Oval, Adelaide");
+  await expect(card(page, 9).locator(".fixture-venue")).toHaveText(longVenue);
+  await expectReadableVenues(page);
+  const historyLength = await page.evaluate(() => history.length);
+  await card(page, 9).getByRole("button", { name: "Georgia", exact: true }).click();
+  const pickedUrl = page.url();
+  await openDetails(page, 9);
+  await expect(dialog(page).locator(".match-dialog-venue")).toHaveText(longVenue);
+  await dialog(page).locator("#match-9-margin").fill("15");
+  await dialog(page).locator("#match-9-homeTries").fill("4");
+  await done(page);
+  const detailedUrl = page.url();
+  await expect(card(page, 9).locator(".fixture-issues")).toHaveCount(0);
+  await undo(page).click();
+  expect(page.url()).toBe(pickedUrl);
+  await expect(card(page, 9).locator(".fixture-venue")).toHaveText(longVenue);
+  await redo(page).click();
+  expect(page.url()).toBe(detailedUrl);
+
+  await view(page).getByRole("button", { name: "Timeline", exact: true }).click();
+  await expectReadableVenues(page);
+  expect(page.url()).toBe(detailedUrl);
+  await page.getByRole("button", { name: "Fill unpicked matches", exact: true }).click();
+  const filledUrl = page.url();
+  await expect(knockout(page)).toContainText("16/16");
+  await knockout(page).click();
+  for (const layout of ["Rounds", "Timeline", "Bracket"]) {
+    await view(page).getByRole("button", { name: layout, exact: true }).click();
+    await expect(page.locator(".fixture-card")).toHaveCount(16);
+    await expect(card(page, 37).locator(".fixture-venue")).toHaveText("Sydney Football Stadium, Sydney");
+    await expect(card(page, 52).locator(".fixture-venue")).toHaveText("Stadium Australia, Sydney");
+    await expectReadableVenues(page);
+    expect(page.url()).toBe(filledUrl);
+  }
+
+  await page.setViewportSize({ width: 320, height: 812 });
+  await pools(page).click();
+  for (const layout of ["By pool", "Timeline"]) {
+    await view(page).getByRole("button", { name: layout, exact: true }).click();
+    await expect(card(page, 9).locator(".fixture-venue")).toHaveText(longVenue);
+    await expectReadableVenues(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    expect(page.url()).toBe(filledUrl);
+  }
+  expect(await page.evaluate(() => history.length)).toBe(historyLength);
+  await undo(page).click();
+  expect(page.url()).toBe(detailedUrl);
+  await undo(page).click();
+  expect(page.url()).toBe(pickedUrl);
+  await expect(card(page, 9).locator(".fixture-venue")).toHaveText(longVenue);
+});
+
 test("pool filters and views preserve the shared URL and prediction undo session", async ({ page }) => {
   test.setTimeout(60000);
   await page.goto("/");

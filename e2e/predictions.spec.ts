@@ -219,7 +219,9 @@ test("mobile details keep focus and layout; copy-link and keyboard undo work", a
   expect(overflow).toBeLessThanOrEqual(1);
   await done(page);
   const predictionUrl = page.url();
-  await page.getByRole("button", { name: /^Copy link/ }).click();
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.getByRole("dialog", { name: "Share predictions", exact: true })
+    .getByRole("button", { name: "Copy URL - Share Full Tournament", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   const copiedUrl = await page.evaluate(() => navigator.clipboard.readText());
   expect(new URL(copiedUrl).origin).toBe(new URL(predictionUrl).origin);
