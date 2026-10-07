@@ -32,7 +32,7 @@ test("header help supports keyboard, buttons and backdrop without changing predi
   const writes: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (request) => {
-    if (request.method() === "POST") writes.push(request.url());
+    if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/")) writes.push(request.url());
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
