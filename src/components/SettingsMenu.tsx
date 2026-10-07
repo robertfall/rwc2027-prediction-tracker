@@ -25,7 +25,7 @@ export function SettingsMenu(props: {
   });
 
   return <div class="settings-menu" ref={(element) => { root = element; }} onFocusOut={(event) => {
-    if (!root.contains(event.relatedTarget as Node | null)) close();
+    if (event.relatedTarget && !root.contains(event.relatedTarget as Node)) close();
   }}>
     <button type="button" class="settings-button" ref={(element) => { trigger = element; }}
       aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded={open()}

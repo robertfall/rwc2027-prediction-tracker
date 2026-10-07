@@ -8,6 +8,7 @@ import { deriveTeamFocus } from "./domain/focus";
 import { TeamFocusPicker } from "./components/TeamFocusPicker";
 import { ShareMenu } from "./components/ShareMenu";
 import { SettingsMenu } from "./components/SettingsMenu";
+import { HelpDialog } from "./components/HelpDialog";
 import { PoolInfographicDialog } from "./components/PoolInfographicDialog";
 import { TimeZoneContext } from "./components/timezone-context";
 import type { DerivedScenario, Scenario } from "./domain/types";
@@ -49,11 +50,13 @@ function App() {
   const [copyStatus, setCopyStatus] = createSignal("");
   const [manualUrl, setManualUrl] = createSignal("");
   const [sharing, setSharing] = createSignal(false);
+  const [showHelp, setShowHelp] = createSignal(false);
   const [poolShare, setPoolShare] = createSignal<{ derived: DerivedScenario; scenario: Scenario; teamId: string; timeZone: string; returnFocus: HTMLElement }>();
   let disposed = false;
   let loadedLinkFocus = linkFocus;
   let detailTrigger: HTMLElement | undefined;
   let detailTriggerId: number | undefined;
+  let helpTrigger!: HTMLButtonElement;
   let loadedTournament = initialState.scenario.tournamentId;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
   const closeDetails = () => { controller.finishGroup(); browser.setMatch(); };
@@ -102,7 +105,7 @@ function App() {
   }));
   const keyboard = (event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
-    if (urlError() || target?.closest("input, textarea, select, [contenteditable=true]") || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (showHelp() || urlError() || target?.closest("input, textarea, select, [contenteditable=true]") || !(event.ctrlKey || event.metaKey) || event.altKey) return;
     if (event.key.toLowerCase() === "z") { event.preventDefault(); if (event.shiftKey) controller.redo(); else controller.undo(); }
     else if (event.key.toLowerCase() === "y") { event.preventDefault(); controller.redo(); }
   };
@@ -204,6 +207,8 @@ function App() {
             }} />
           <SettingsMenu timeZone={timeZone()} onChange={(value) => { setTimeZone(value); rememberTimeZone(value); }} />
         </div>
+        <button ref={(element) => { helpTrigger = element; }} type="button" class="help-button" aria-label="How does it work?" title="How does it work?"
+          aria-haspopup="dialog" aria-expanded={showHelp()} onClick={() => setShowHelp(true)}><Icon name="help" size={20} /></button>
       </div>
       <div class="toolbar-views"><div class="toolbar-views-inner">
         <div class="segmented view-options" role="group" aria-label="View">
@@ -263,6 +268,7 @@ function App() {
       </footer>
     </main>
     <div classList={{ "share-status": true, "share-status--visible": Boolean(copyStatus()) }} role="status">{copyStatus()}</div>
+    <Show when={showHelp()}><HelpDialog provisionalRules={tournament().rulesStatus === "provisional"} returnFocus={helpTrigger} onClose={() => setShowHelp(false)} /></Show>
     <Show when={poolShare()}>{(snapshot) => <PoolInfographicDialog derived={snapshot().derived} scenario={snapshot().scenario} teamId={snapshot().teamId} timeZone={snapshot().timeZone} posterClient={posterClient}
       returnFocus={snapshot().returnFocus} onClose={() => setPoolShare(undefined)} />}</Show>
     <Show when={activeFixtureId()} keyed>{(id) => <MatchDetailsDialog fixture={fixtureById().get(id)!} controller={controller} onClose={closeDetails}

@@ -30,6 +30,8 @@
 .settings-menu { position: relative; }
 .settings-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-height: 36px; padding: 0; border: 1px solid var(--color-border-strong); border-radius: 8px; background: white; color: var(--color-ink); }
 .settings-button:hover, .settings-button[aria-expanded=true] { background: var(--color-paper); }
+.help-button { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 36px; min-height: 36px; margin-left: -18px; padding: 0; border: 1px solid var(--color-border-strong); border-radius: 8px; background: white; color: var(--color-ink); }
+.help-button:hover, .help-button[aria-expanded=true] { background: var(--color-paper); }
 .settings-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 2; width: 300px; max-width: calc(100vw - 32px); padding: 16px; border: 1px solid var(--color-border-strong); border-radius: 10px; background: white; box-shadow: 0 8px 24px rgb(32 42 39 / .14); }
 .settings-popover label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
 .settings-popover select { width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: white; color: var(--color-ink); font: inherit; }
@@ -308,8 +310,26 @@
 .pool-infographic-publication:empty { display: none; }
 .pool-infographic-direct { margin-top: 12px; font-size: 13px; }
 .pool-infographic-direct summary { padding-block: 8px; cursor: pointer; }
+.help-dialog { width: min(700px, calc(100vw - 32px)); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: white; color: var(--color-ink); overflow: hidden; box-shadow: 0 16px 48px rgb(32 42 39 / .16); }
+.help-dialog[open] { display: flex; flex-direction: column; }
+.help-dialog::backdrop, .help-dialog-backdrop { background: rgb(32 42 39 / .55); }
+.help-dialog-backdrop { position: fixed; inset: 0; z-index: 100; }
+.help-dialog--fallback { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; z-index: 101; }
+.help-dialog-heading { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--color-border-subtle); }
+.help-dialog-heading h2 { font-size: 22px; line-height: 1.25; font-weight: 700; }
+.help-dialog-heading .match-dialog-close { margin: -8px -8px -8px 0; }
+.help-dialog-body { flex: 1 1 auto; min-height: 0; padding: 24px; overflow-y: auto; overscroll-behavior: contain; }
+.help-dialog-intro { max-width: 56ch; color: var(--color-muted); font-size: 15px; line-height: 1.5; }
+.help-dialog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; margin-top: 24px; }
+.help-dialog-grid h3 { margin-bottom: 6px; color: var(--color-eucalyptus); font-size: 16px; font-weight: 700; line-height: 1.35; }
+.help-dialog-grid p { font-size: 14px; line-height: 1.55; }
+.help-dialog-note { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--color-border-subtle); color: var(--color-muted); font-size: 12px; line-height: 1.5; }
+.help-dialog-actions { display: flex; flex: none; justify-content: end; padding: 12px 24px; border-top: 1px solid var(--color-border-subtle); background: var(--color-paper); }
+.help-dialog-actions button { min-height: 44px; padding: 8px 20px; border: 0; border-radius: 8px; background: var(--color-eucalyptus); color: white; font-size: 14px; font-weight: 600; }
+.help-dialog-actions button:hover { background: var(--color-eucalyptus-hover); }
 @media (max-width: 959px) {
   .toolbar-main { gap: 0 12px; }
+  .help-button { margin-left: -6px; }
   .wordmark { font-size: 16px; }
   .pool-layout, .timeline-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .pool-context { order: -1; position: static; }
@@ -328,8 +348,12 @@
   .copy-button { width: 44px; min-width: 44px; min-height: 44px; padding: 0; }
   .copy-button > span { display: none; }
   .settings-button { width: 44px; min-height: 44px; }
-  .view-nav { order: 3; flex: 1 0 100%; justify-content: space-between; }
-  .view-nav button { gap: 6px; }
+  .view-nav { order: 3; flex: 1 1 calc(100% - 52px); min-width: 0; justify-content: space-between; }
+  .help-button { order: 4; width: 44px; min-height: 44px; margin-left: 0; }
+  .view-nav button { gap: 4px; padding-inline: 4px; font-size: 14px; }
+  .view-nav .stage-count { font-size: 12px; }
+  .view-nav .stage-number { width: 18px; height: 18px; }
+  .view-nav .stage-chevron { width: 12px; }
   .stage-tooltip { left: auto; right: 0; width: min(250px, 80vw); }
   .toolbar-views-inner { gap: 8px; padding-block: 8px; }
   .view-options { max-width: none; flex: 1 1 150px; }
@@ -377,4 +401,13 @@
   .field-clear { height: 38px; }
   .team-details .team-flag { display: none; }
   .recovery-banner { flex-direction: column; align-items: start; }
+  .help-dialog-heading { padding: 16px; }
+  .help-dialog-heading h2 { font-size: 20px; }
+  .help-dialog-body { padding: 20px 16px; }
+  .help-dialog-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; margin-top: 20px; }
+  .help-dialog-note { margin-top: 20px; }
+  .help-dialog-actions { padding-inline: 16px; }
+}
+@media (max-width: 359px) {
+  .view-nav .stage-number { display: none; }
 }

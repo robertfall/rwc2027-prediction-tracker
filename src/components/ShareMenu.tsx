@@ -26,7 +26,8 @@ export function ShareMenu(props: {
     onCleanup(() => document.removeEventListener("pointerdown", outside));
   });
   return <div class="share-menu" ref={(element) => { root = element; }} onFocusOut={(event) => {
-    if (!root.contains(event.relatedTarget as Node | null)) close();
+    // Safari can clear focus before an option's click. Outside taps close via pointerdown.
+    if (event.relatedTarget && !root.contains(event.relatedTarget as Node)) close();
   }}>
     <button type="button" class="copy-button" ref={(element) => { trigger = element; }}
       aria-label="Share" aria-haspopup="dialog" aria-expanded={open()} aria-controls={open() ? id : undefined}

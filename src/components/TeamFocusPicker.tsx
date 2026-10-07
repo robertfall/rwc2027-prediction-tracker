@@ -95,7 +95,7 @@ export function TeamFocusPicker(props: {
   });
 
   return <div class="team-focus" ref={(element) => { root = element; }} onFocusOut={(event) => {
-    if (!root.contains(event.relatedTarget as Node | null)) setOpen(false);
+    if (event.relatedTarget && !root.contains(event.relatedTarget as Node)) setOpen(false);
   }}>
     <span class="control-caption">Focus</span>
     <button ref={(element) => { trigger = element; }} type="button" class="team-focus-trigger" role="combobox" aria-label="Focus"
@@ -110,7 +110,7 @@ export function TeamFocusPicker(props: {
       <For each={options()}>{(team, index) => <button type="button" id={optionId(index())}
         class="team-focus-option" classList={{ "is-active": active() === index() }} role="option" tabindex="-1"
         aria-selected={(team?.id ?? "") === (props.value ?? "")} data-team-id={team?.id ?? ""}
-        onPointerDown={(event) => event.preventDefault()}
+        onPointerDown={(event) => { if (event.pointerType === "mouse") event.preventDefault(); }}
         onPointerMove={(event) => { if (event.pointerType === "mouse") setActive(index()); }}
         onClick={() => choose(index())}>
         <TeamLabel team={team} fallback="All teams" />
