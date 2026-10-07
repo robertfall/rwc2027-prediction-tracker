@@ -159,9 +159,12 @@ test("explicit poster sharing stores its exact PNG and returns visitors from a n
   let destination!: string;
   try {
     const landing = await crawler.newPage();
-    await landing.goto(link);
+    const landingResponse = await landing.goto(link);
     await expect(landing.getByRole("img")).toHaveAttribute("src", stored.imageUrl);
-    await expect(landing.locator("script")).toHaveCount(0);
+    // Cloudflare can inject its analytics beacon; the page still needs no scripts.
+    const policy = landingResponse?.headers()["content-security-policy"];
+    expect(policy).toContain("default-src 'none'");
+    expect(policy).not.toMatch(/(?:^|;)\s*script-src(?:-elem)?\s/);
     await expect(landing.locator('meta[property="og:image"]')).toHaveAttribute("content", imageUrl);
     await expect(landing.locator('meta[property="og:url"]')).toHaveAttribute("content", link);
     await expect(landing.locator('meta[property="og:title"]')).toHaveAttribute("content", /South Africa/);
